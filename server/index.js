@@ -7,19 +7,19 @@ const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 
-// CORS : localhost en dev, et ton front prod
 const allowedOrigins = [
     'http://localhost:3000',
-    'https://webrtctest-ux3c.onrender.com'
+    'https://webrtctest-ux3c.onrender.com',   // si tu testes depuis là
+    'https://webrtctest-12.onrender.com'      // ton front réellement en prod
   ];
+  
   app.use(cors({
     origin(origin, callback) {
-      // permettre les requêtes sans origine (Postman, etc.)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} non autorisée`));
       }
-      return callback(new Error(`Origin ${origin} non autorisée`));
     }
   }));
   app.options('*', cors());
