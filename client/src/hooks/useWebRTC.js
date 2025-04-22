@@ -81,6 +81,8 @@ export default function useWebRTC(
       // --- LOCAL SPEECH DETECTION ---
       const audioCtxLocal = new (window.AudioContext ||
         window.webkitAudioContext)();
+      // ensure AudioContext is running
+      audioCtxLocal.resume().catch(() => {});
       const analyserLocal = audioCtxLocal.createAnalyser();
       const srcLocal = audioCtxLocal.createMediaStreamSource(
         localStreamRef.current
@@ -103,15 +105,21 @@ export default function useWebRTC(
         .getTracks()
         .forEach((t) => pcRef.current.addTrack(t, localStreamRef.current));
 
-      // --- REMOTE SPEECH DETECTION on first track ---
+      // --- REMOTE SPEECH DETECTION on first track + force playback ---
       pcRef.current.ontrack = ({ streams: [stream] }) => {
-        // attach remote audio
-        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream;
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = stream;
+          // force playback in case autoplay is blocked
+          remoteAudioRef.current
+            .play()
+            .catch((err) => console.warn("Lecture auto bloquée :", err));
+        }
 
         // once remote stream arrives, set up analyser once
         if (!remoteSpeaking) {
           const audioCtxRemote = new (window.AudioContext ||
             window.webkitAudioContext)();
+          audioCtxRemote.resume().catch(() => {});
           const analyserRemote = audioCtxRemote.createAnalyser();
           const srcRemote = audioCtxRemote.createMediaStreamSource(stream);
           srcRemote.connect(analyserRemote);

@@ -129,7 +129,7 @@ export default function CallPage({ callId }) {
         </button>
       </footer>
 
-      <audio ref={remoteAudioRef} autoPlay hidden />
-    </div>
+      <audio ref={remoteAudioRef} autoPlay controls />
+      </div>
   );
 }
