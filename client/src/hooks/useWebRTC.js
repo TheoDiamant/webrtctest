@@ -190,7 +190,7 @@ export default function useWebRTC(callId, { timeout = 30000, start = true }) {
       wsRef.current?.close();
       pcRef.current?.close();
     };
-  }, [callId, start, status, timeout]);
+}, [callId, start]);
 
   function sendMessage(text) {
     if (dataChannelRef.current?.readyState === "open") {
