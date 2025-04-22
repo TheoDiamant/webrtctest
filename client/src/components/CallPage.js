@@ -22,7 +22,7 @@ export default function CallPage({ callId }) {
     hangUp,
     localSpeaking,
     remoteSpeaking,
-  } = useWebRTC(callId, { start: accepted, timeout: 30000 });
+  } = useWebRTC(callId, { start: accepted, timeout: 30000, isInitiator });
 
   const [msg, setMsg] = useState("");
   const fullLink = window.location.href;

@@ -1,7 +1,10 @@
 // src/hooks/useWebRTC.js
 import { useEffect, useRef, useState } from "react";
 
-export default function useWebRTC(callId, { timeout = 30000, start = true }) {
+export default function useWebRTC(
+  callId,
+  { timeout = 30000, start = true, isInitiator = false }
+) {
   const wsRef = useRef();
   const pcRef = useRef();
   const dataChannelRef = useRef();
@@ -36,9 +39,9 @@ export default function useWebRTC(callId, { timeout = 30000, start = true }) {
 
       switch (msg.type) {
         case "room-status":
-          // once two peers are in, initiator starts the call
           if (msg.peers === 2 && status === "waiting") {
-            await initiateCall(true);
+            // seul l'initiateur fera l'offre, l'autre préparera sans offrir
+            await initiateCall(isInitiator);
           }
           break;
 
@@ -46,9 +49,7 @@ export default function useWebRTC(callId, { timeout = 30000, start = true }) {
           await pcRef.current.setRemoteDescription(msg.offer);
           const answer = await pcRef.current.createAnswer();
           await pcRef.current.setLocalDescription(answer);
-          wsRef.current.send(
-            JSON.stringify({ type: "answer", answer })
-          );
+          wsRef.current.send(JSON.stringify({ type: "answer", answer }));
           break;
 
         case "answer":
@@ -78,23 +79,20 @@ export default function useWebRTC(callId, { timeout = 30000, start = true }) {
       });
 
       // --- LOCAL SPEECH DETECTION ---
-      const audioCtxLocal =
-        new (window.AudioContext || window.webkitAudioContext)();
+      const audioCtxLocal = new (window.AudioContext ||
+        window.webkitAudioContext)();
       const analyserLocal = audioCtxLocal.createAnalyser();
       const srcLocal = audioCtxLocal.createMediaStreamSource(
         localStreamRef.current
       );
       srcLocal.connect(analyserLocal);
       analyserLocal.fftSize = 256;
-      const dataArrayLocal = new Uint8Array(
-        analyserLocal.frequencyBinCount
-      );
+      const dataArrayLocal = new Uint8Array(analyserLocal.frequencyBinCount);
 
       function detectLocal() {
         analyserLocal.getByteFrequencyData(dataArrayLocal);
         const avg =
-          dataArrayLocal.reduce((sum, v) => sum + v, 0) /
-          dataArrayLocal.length;
+          dataArrayLocal.reduce((sum, v) => sum + v, 0) / dataArrayLocal.length;
         setLocalSpeaking(avg > 30);
         requestAnimationFrame(detectLocal);
       }
@@ -103,24 +101,19 @@ export default function useWebRTC(callId, { timeout = 30000, start = true }) {
       // add tracks to peer
       localStreamRef.current
         .getTracks()
-        .forEach((t) =>
-          pcRef.current.addTrack(t, localStreamRef.current)
-        );
+        .forEach((t) => pcRef.current.addTrack(t, localStreamRef.current));
 
       // --- REMOTE SPEECH DETECTION on first track ---
       pcRef.current.ontrack = ({ streams: [stream] }) => {
         // attach remote audio
-        if (remoteAudioRef.current)
-          remoteAudioRef.current.srcObject = stream;
+        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream;
 
         // once remote stream arrives, set up analyser once
         if (!remoteSpeaking) {
-          const audioCtxRemote =
-            new (window.AudioContext || window.webkitAudioContext)();
+          const audioCtxRemote = new (window.AudioContext ||
+            window.webkitAudioContext)();
           const analyserRemote = audioCtxRemote.createAnalyser();
-          const srcRemote = audioCtxRemote.createMediaStreamSource(
-            stream
-          );
+          const srcRemote = audioCtxRemote.createMediaStreamSource(stream);
           srcRemote.connect(analyserRemote);
           analyserRemote.fftSize = 256;
           const dataArrayRemote = new Uint8Array(
@@ -141,9 +134,7 @@ export default function useWebRTC(callId, { timeout = 30000, start = true }) {
 
       // set up data channel
       if (isInitiator) {
-        dataChannelRef.current = pcRef.current.createDataChannel(
-          "chat"
-        );
+        dataChannelRef.current = pcRef.current.createDataChannel("chat");
         setupDataChannel();
       } else {
         pcRef.current.ondatachannel = ({ channel }) => {
@@ -155,9 +146,7 @@ export default function useWebRTC(callId, { timeout = 30000, start = true }) {
       // ICE candidates
       pcRef.current.onicecandidate = ({ candidate }) => {
         if (candidate)
-          wsRef.current.send(
-            JSON.stringify({ type: "candidate", candidate })
-          );
+          wsRef.current.send(JSON.stringify({ type: "candidate", candidate }));
       };
 
       // offer/answer exchange
@@ -171,13 +160,9 @@ export default function useWebRTC(callId, { timeout = 30000, start = true }) {
     }
 
     function setupDataChannel() {
-      dataChannelRef.current.onopen = () =>
-        console.log("DataChannel open");
+      dataChannelRef.current.onopen = () => console.log("DataChannel open");
       dataChannelRef.current.onmessage = ({ data }) =>
-        setChatMessages((prev) => [
-          ...prev,
-          { sender: "peer", text: data },
-        ]);
+        setChatMessages((prev) => [...prev, { sender: "peer", text: data }]);
     }
 
     // timeout if not connected
@@ -190,22 +175,18 @@ export default function useWebRTC(callId, { timeout = 30000, start = true }) {
       wsRef.current?.close();
       pcRef.current?.close();
     };
-}, [callId, start]);
+  }, [callId, start]);
 
   function sendMessage(text) {
     if (dataChannelRef.current?.readyState === "open") {
       dataChannelRef.current.send(text);
-      setChatMessages((prev) => [
-        ...prev,
-        { sender: "local", text },
-      ]);
+      setChatMessages((prev) => [...prev, { sender: "local", text }]);
     }
   }
 
   function toggleMute() {
     if (localStreamRef.current) {
-      const track = localStreamRef.current
-        .getAudioTracks()[0];
+      const track = localStreamRef.current.getAudioTracks()[0];
       track.enabled = !track.enabled;
     }
   }
