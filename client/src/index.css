@@ -61,6 +61,13 @@ body, html { width: 100%; height: 100%; font-family: "Google Sans", sans-serif; 
   align-items: center;
   text-align: center;
 }
+
+.call-incoming .btn {
+    width: 120px;
+    text-align: center;
+    /* autres styles existants… */
+  }
+  
 .incoming-actions {
   margin-top: 2rem;
   display: flex;

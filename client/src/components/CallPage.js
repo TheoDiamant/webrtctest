@@ -20,6 +20,8 @@ export default function CallPage({ callId }) {
     sendMessage,
     toggleMute,
     hangUp,
+    localSpeaking,
+    remoteSpeaking,
   } = useWebRTC(callId, { start: accepted, timeout: 30000 });
 
   const [msg, setMsg] = useState("");
@@ -54,25 +56,33 @@ export default function CallPage({ callId }) {
         </header>
         <div className="incoming-actions">
           <button className="btn accept" onClick={() => setAccepted(true)}>
-            <i className="material-icons">call</i> Décrocher
+            Accepter
           </button>
-          <button className="btn reject" onClick={() => (window.location.href = "/")}>
-            <i className="material-icons">call_end</i> Raccrocher
+          <button
+            className="btn reject"
+            onClick={() => (window.location.href = "/")}
+          >
+            Refuser
           </button>
         </div>
       </div>
     );
   }
-
   return (
     <div className={`call-app${chatOpen ? " chat-open" : ""}`}>
       <header className="header">
         <span className="meeting-id">ID de réunion : {callId}</span>
         <div className="header-actions">
-          <button className="copy-btn" onClick={() => navigator.clipboard.writeText(fullLink)}>
+          <button
+            className="copy-btn"
+            onClick={() => navigator.clipboard.writeText(fullLink)}
+          >
             <i className="material-icons">content_copy</i>
           </button>
-          <button className="chat-toggle-btn" onClick={() => setChatOpen(o => !o)}>
+          <button
+            className="chat-toggle-btn"
+            onClick={() => setChatOpen((o) => !o)}
+          >
             <i className="material-icons">chat_bubble_outline</i>
           </button>
         </div>
@@ -91,10 +101,10 @@ export default function CallPage({ callId }) {
 
         <div className="video-card">
           <div className="pic-wrapper">
-            <img src="/images/icon.png" alt="Interlocuteur" className="profile-pic" />
-            <div className="wave"></div>
+            <img src="/images/icon.png" alt="Vous" className="profile-pic" />
+            {localSpeaking && <div className="wave"></div>}
           </div>
-          <span className="name">Interlocuteur</span>
+          <span className="name">Vous</span>
         </div>
 
         <aside className="chat-panel">

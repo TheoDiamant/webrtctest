@@ -60,16 +60,21 @@ wss.on("connection", (ws, req) => {
     c.send(JSON.stringify({ type: "room-status", peers: rooms[callId].length }))
   );
 
-  ws.on("message", (msg) => {
-    let d;
+// server/index.js (dans wss.on('connection'))
+ws.on('message', msg => {
+    // msg peut être string ou Buffer
+    const text = typeof msg === 'string' ? msg : msg.toString();
+    let data;
     try {
-      d = JSON.parse(msg);
+      data = JSON.parse(text);
     } catch {
-      return;
+      return; // ignore tout ce qui n'est pas du JSON valide
     }
-    if (["offer", "answer", "candidate"].includes(d.type)) {
-      rooms[callId].forEach((c) => {
-        if (c !== ws && c.readyState === c.OPEN) c.send(msg);
+    if (['offer','answer','candidate'].includes(data.type)) {
+      rooms[callId].forEach(client => {
+        if (client !== ws && client.readyState === client.OPEN) {
+          client.send(text);  // envoie toujours du texte
+        }
       });
     }
   });

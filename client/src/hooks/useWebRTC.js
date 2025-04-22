@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 
 export default function useWebRTC(callId, { timeout = 30000, start = true }) {
   const wsRef = useRef();
@@ -6,78 +6,113 @@ export default function useWebRTC(callId, { timeout = 30000, start = true }) {
   const dataChannelRef = useRef();
   const remoteAudioRef = useRef();
   const localStreamRef = useRef();
-  const [status, setStatus] = useState('waiting');
+  const [status, setStatus] = useState("waiting");
   const [chatMessages, setChatMessages] = useState([]);
 
   useEffect(() => {
     if (!start) return;
     const serverUrl = process.env.REACT_APP_SERVER_URL;
-    wsRef.current = new WebSocket(`${serverUrl.replace(/^http/, 'ws')}?roomId=${callId}`);
+    wsRef.current = new WebSocket(
+      `${serverUrl.replace(/^http/, "ws")}?roomId=${callId}`
+    );
 
     wsRef.current.onmessage = async ({ data }) => {
       const msg = JSON.parse(data);
       switch (msg.type) {
-        case 'room-status':
-          if (msg.peers === 2 && status === 'waiting') {
+        case "room-status":
+          if (msg.peers === 2 && status === "waiting") {
             await initiateCall(true);
           }
           break;
-        case 'offer':
+        case "offer":
           await pcRef.current.setRemoteDescription(msg.offer);
           const answer = await pcRef.current.createAnswer();
           await pcRef.current.setLocalDescription(answer);
-          wsRef.current.send(JSON.stringify({ type: 'answer', answer }));
+          wsRef.current.send(JSON.stringify({ type: "answer", answer }));
           break;
-        case 'answer':
+        case "answer":
           await pcRef.current.setRemoteDescription(msg.answer);
           break;
-        case 'candidate':
+        case "candidate":
           await pcRef.current.addIceCandidate(msg.candidate);
           break;
-        case 'peer-left':
-          setStatus('peer-left');
+        case "peer-left":
+          setStatus("peer-left");
           break;
         default:
           break;
       }
     };
 
-    wsRef.current.onopen = () => console.log('WS open');
-    wsRef.current.onclose = () => console.log('WS closed');
+    wsRef.current.onopen = () => console.log("WS open");
+    wsRef.current.onclose = () => console.log("WS closed");
 
     async function initiateCall(isInitiator) {
-      setStatus('connecting');
-      pcRef.current = new RTCPeerConnection({ iceServers: [{ urls: process.env.REACT_APP_STUN_SERVER }] });
-      localStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-      localStreamRef.current.getTracks().forEach(t => pcRef.current.addTrack(t, localStreamRef.current));
-      pcRef.current.ontrack = ({ streams: [stream] }) => { if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream; };
+      setStatus("connecting");
+      pcRef.current = new RTCPeerConnection({
+        iceServers: [{ urls: process.env.REACT_APP_STUN_SERVER }],
+      });
+      localStreamRef.current = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+      const audioCtx = new AudioContext();
+      const analyserLocal = audioCtx.createAnalyser();
+      const sourceLocal = audioCtx.createMediaStreamSource(
+        localStreamRef.current
+      );
+      sourceLocal.connect(analyserLocal);
+      analyserLocal.fftSize = 256;
+      const dataArray = new Uint8Array(analyserLocal.frequencyBinCount);
+
+      const [localSpeaking, setLocalSpeaking] = useState(false);
+
+      function detectLocalSpeaking() {
+        analyserLocal.getByteFrequencyData(dataArray);
+        const avg = dataArray.reduce((sum, v) => sum + v, 0) / dataArray.length;
+        setLocalSpeaking(avg > 30); // seuil à ajuster
+        requestAnimationFrame(detectLocalSpeaking);
+      }
+      detectLocalSpeaking();
+      localStreamRef.current
+        .getTracks()
+        .forEach((t) => pcRef.current.addTrack(t, localStreamRef.current));
+      pcRef.current.ontrack = ({ streams: [stream] }) => {
+        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream;
+      };
 
       if (isInitiator) {
-        dataChannelRef.current = pcRef.current.createDataChannel('chat');
+        dataChannelRef.current = pcRef.current.createDataChannel("chat");
         setupDataChannel();
       } else {
-        pcRef.current.ondatachannel = ({ channel }) => { dataChannelRef.current = channel; setupDataChannel(); };
+        pcRef.current.ondatachannel = ({ channel }) => {
+          dataChannelRef.current = channel;
+          setupDataChannel();
+        };
       }
 
       pcRef.current.onicecandidate = ({ candidate }) => {
-        if (candidate) wsRef.current.send(JSON.stringify({ type: 'candidate', candidate }));
+        if (candidate)
+          wsRef.current.send(JSON.stringify({ type: "candidate", candidate }));
       };
 
       if (isInitiator) {
         const offer = await pcRef.current.createOffer();
         await pcRef.current.setLocalDescription(offer);
-        wsRef.current.send(JSON.stringify({ type: 'offer', offer }));
+        wsRef.current.send(JSON.stringify({ type: "offer", offer }));
       }
 
-      setStatus('connected');
+      setStatus("connected");
     }
 
     function setupDataChannel() {
-      dataChannelRef.current.onopen = () => console.log('DataChannel open');
-      dataChannelRef.current.onmessage = ({ data }) => setChatMessages(prev => [...prev, { sender: 'peer', text: data }]);
+      dataChannelRef.current.onopen = () => console.log("DataChannel open");
+      dataChannelRef.current.onmessage = ({ data }) =>
+        setChatMessages((prev) => [...prev, { sender: "peer", text: data }]);
     }
 
-    const timer = setTimeout(() => { if (status !== 'connected') setStatus('timeout'); }, timeout);
+    const timer = setTimeout(() => {
+      if (status !== "connected") setStatus("timeout");
+    }, timeout);
 
     return () => {
       clearTimeout(timer);
@@ -87,9 +122,9 @@ export default function useWebRTC(callId, { timeout = 30000, start = true }) {
   }, [callId, start]);
 
   function sendMessage(text) {
-    if (dataChannelRef.current?.readyState === 'open') {
+    if (dataChannelRef.current?.readyState === "open") {
       dataChannelRef.current.send(text);
-      setChatMessages(prev => [...prev, { sender: 'local', text }]);
+      setChatMessages((prev) => [...prev, { sender: "local", text }]);
     }
   }
 
@@ -103,8 +138,17 @@ export default function useWebRTC(callId, { timeout = 30000, start = true }) {
   function hangUp() {
     wsRef.current.close();
     pcRef.current.close();
-    setStatus('ended');
+    setStatus("ended");
   }
 
-  return { remoteAudioRef, status, chatMessages, sendMessage, toggleMute, hangUp };
+  return {
+    remoteAudioRef,
+    status,
+    chatMessages,
+    sendMessage,
+    toggleMute,
+    hangUp,
+    localSpeaking,
+    remoteSpeaking
+  };
 }
