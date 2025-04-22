@@ -1,40 +1,44 @@
 // server/index.js
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const http = require('http');
-const path = require('path');
-const { WebSocketServer } = require('ws');
-const { v4: uuidv4 } = require('uuid');
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const http = require("http");
+const path = require("path");
+const { WebSocketServer } = require("ws");
+const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 
 // CORS (autorise ton front Render et localhost)
 const allowedOrigins = [
-  'http://localhost:3000',
-  'https://webrtctest-12.onrender.com',   // ton front prod
+  "http://localhost:3000",
+  "https://webrtctest-ux3c.onrender.com", // **le bon domaine** ici
 ];
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error(`Origin ${origin} non autorisée`));
-  }
-}));
-app.options('*', cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin))
+        return callback(null, true);
+      callback(new Error(`Origin ${origin} non autorisée`));
+    },
+  })
+);
+app.options("*", cors());
 app.use(express.json());
 
 // --- ROUTE API protégée ---
 function auth(req, res, next) {
   const h = req.headers.authorization;
-  if (!h) return res.status(401).send('Unauthorized');
-  const [scheme, encoded] = h.split(' ');
-  if (scheme !== 'Basic' || !encoded) return res.status(401).send('Unauthorized');
-  const [u, p] = Buffer.from(encoded, 'base64').toString().split(':');
+  if (!h) return res.status(401).send("Unauthorized");
+  const [scheme, encoded] = h.split(" ");
+  if (scheme !== "Basic" || !encoded)
+    return res.status(401).send("Unauthorized");
+  const [u, p] = Buffer.from(encoded, "base64").toString().split(":");
   if (u === process.env.USERNAME && p === process.env.PASSWORD) return next();
-  return res.status(403).send('Forbidden');
+  return res.status(403).send("Forbidden");
 }
 
-app.post('/create-call', auth, (req, res) => {
+app.post("/create-call", auth, (req, res) => {
   res.json({ callId: uuidv4() });
 });
 
@@ -43,41 +47,48 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 const rooms = {};
 
-wss.on('connection', (ws, req) => {
-  const params = new URLSearchParams(req.url.replace(/^.*\?/, ''));
-  const callId = params.get('roomId');
+wss.on("connection", (ws, req) => {
+  const params = new URLSearchParams(req.url.replace(/^.*\?/, ""));
+  const callId = params.get("roomId");
   if (!callId) return ws.close();
 
   rooms[callId] = rooms[callId] || [];
   rooms[callId].push(ws);
 
   // informe du nb de pairs
-  rooms[callId].forEach(c => c.send(JSON.stringify({ type: 'room-status', peers: rooms[callId].length })));
+  rooms[callId].forEach((c) =>
+    c.send(JSON.stringify({ type: "room-status", peers: rooms[callId].length }))
+  );
 
-  ws.on('message', msg => {
+  ws.on("message", (msg) => {
     let d;
-    try { d = JSON.parse(msg); } catch { return; }
-    if (['offer','answer','candidate'].includes(d.type)) {
-      rooms[callId].forEach(c => {
+    try {
+      d = JSON.parse(msg);
+    } catch {
+      return;
+    }
+    if (["offer", "answer", "candidate"].includes(d.type)) {
+      rooms[callId].forEach((c) => {
         if (c !== ws && c.readyState === c.OPEN) c.send(msg);
       });
     }
   });
-  ws.on('close', () => {
-    rooms[callId] = rooms[callId].filter(c => c !== ws);
-    rooms[callId].forEach(c => {
-      if (c.readyState === c.OPEN) c.send(JSON.stringify({ type: 'peer-left' }));
+  ws.on("close", () => {
+    rooms[callId] = rooms[callId].filter((c) => c !== ws);
+    rooms[callId].forEach((c) => {
+      if (c.readyState === c.OPEN)
+        c.send(JSON.stringify({ type: "peer-left" }));
     });
   });
 });
 
 // --- SERVIR LE BUILD REACT ---
-const buildPath = path.join(__dirname, '../client/build');
+const buildPath = path.join(__dirname, "../client/build");
 app.use(express.static(buildPath));
 
 // Fallback pour toutes les routes non-API : renvoie index.html
-app.get('*', (req, res) => {
-  res.sendFile(path.join(buildPath, 'index.html'));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(buildPath, "index.html"));
 });
 
 // --- LANCEMENT DU SERVEUR ---
