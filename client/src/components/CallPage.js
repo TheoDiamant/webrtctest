@@ -1,17 +1,24 @@
-// src/components/CallPage.jsx
 import React, { useState, useEffect } from "react";
 import useWebRTC from "../hooks/useWebRTC";
 import Chat from "./Chat";
+import PrecallSplash from "./PrecallSplash";
+
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import MicIcon from "@mui/icons-material/Mic";
+import MicOffIcon from "@mui/icons-material/MicOff";
+import CallEndIcon from "@mui/icons-material/CallEnd";
 
 export default function CallPage({ callId }) {
-  // initiator flag
   const params = new URLSearchParams(window.location.search);
-  const urlInit = params.get("initiator") === "true";
-  const sessInit = sessionStorage.getItem("isInitiator") === "true";
-  const isInitiator = urlInit || sessInit;
+  const isInitiator =
+    params.get("initiator") === "true" ||
+    sessionStorage.getItem("isInitiator") === "true";
 
-  const [accepted, setAccepted] = useState(isInitiator);
+  // invitees see a splash first
+  const [splashDone, setSplashDone] = useState(isInitiator);
   const [chatOpen, setChatOpen] = useState(false);
+  const [muted, setMuted] = useState(false);
 
   const {
     remoteAudioRef,
@@ -22,89 +29,110 @@ export default function CallPage({ callId }) {
     hangUp,
     localSpeaking,
     remoteSpeaking,
-  } = useWebRTC(callId, { start: accepted, timeout: 30000, isInitiator });
+    remoteMuted,
+  } = useWebRTC(callId, {
+    start: splashDone,
+    timeout: 30000,
+    isInitiator,
+  });
 
   const [msg, setMsg] = useState("");
   const fullLink = window.location.href;
 
-  function playBeep() {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator();
-    o.type = "sine";
-    o.frequency.value = 440;
-    o.connect(ctx.destination);
-    o.start();
-    setTimeout(() => o.stop(), 200);
-  }
-  function playHangup() {
-    new Audio("/sounds/skype-hangup.mp3").play();
-  }
-
+  // play tones / navigate home after hangup
   useEffect(() => {
-    if (status === "connected") playBeep();
-    if (status === "peer-left" || status === "ended") {
-      playHangup();
-      setTimeout(() => (window.location.href = "/"), 2000);
+    function goHome() {
+      window.location.href = "/";
     }
-  }, [status]);
+    if (status === "connected") {
+      const ctx = new (window.AudioContext ||
+        window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = 440;
+      osc.connect(ctx.destination);
+      osc.start();
+      setTimeout(() => osc.stop(), 200);
+    }
+    if (status === "peer-left" || status === "ended") {
+      new Audio("/sounds/skype-hangup.mp3").play();
+      // only auto-exit guest
+      if (!isInitiator) setTimeout(goHome, 2000);
+      // host stays, but call-ended will redirect anyway
+    }
+  }, [status, isInitiator]);
 
-  if (!accepted) {
-    return (
-      <div className="call-app call-incoming">
-        <header className="header">
-          <h3>Appel entrant</h3>
-        </header>
-        <div className="incoming-actions">
-          <button className="btn accept" onClick={() => setAccepted(true)}>
-            Accepter
-          </button>
-          <button
-            className="btn reject"
-            onClick={() => (window.location.href = "/")}
-          >
-            Refuser
-          </button>
-        </div>
-      </div>
-    );
+  const handleMute = () => {
+    toggleMute();
+    setMuted((m) => !m);
+  };
+
+  // 1) show splash for invitees
+  if (!splashDone) {
+    return <PrecallSplash onReady={() => setSplashDone(true)} />;
   }
+
+  // 2) main UI
   return (
-    <div className={`call-app${chatOpen ? " chat-open" : ""}`}>
+    <div className={`call-app dark${chatOpen ? " chat-open" : ""}`}>
       <header className="header">
-        <span className="meeting-id">ID de réunion : {callId}</span>
+        <span className="meeting-id">ID : {callId}</span>
         <div className="header-actions">
+         
           <button
-            className="copy-btn"
-            onClick={() => navigator.clipboard.writeText(fullLink)}
-          >
-            <i className="material-icons">content_copy</i>
-          </button>
-          <button
-            className="chat-toggle-btn"
+            className="icon-btn"
             onClick={() => setChatOpen((o) => !o)}
           >
-            <i className="material-icons">chat_bubble_outline</i>
+            <ChatBubbleOutlineIcon fontSize="small" />
           </button>
         </div>
       </header>
 
+      {/* only host sees status */}
+      {isInitiator && (
+        <div className="status-indicator">
+          {status === "waiting" && "En attente de l’autre personne…"}
+          {status === "connecting" && "Connexion en cours…"}
+          {status === "connected" && "Interlocuteur connecté !"}
+          {status === "timeout" && "Temps d’attente dépassé"}
+          {status === "peer-left" && "L’autre personne a quitté"}
+          {status === "ended" && "Appel terminé"}
+        </div>
+      )}
+
       <main className="main-grid">
+        {/* Local card */}
         <div className="video-card">
+          {muted && (
+            <div className="mute-indicator local">
+              <MicOffIcon fontSize="small" /> Muet
+            </div>
+          )}
           <div className="pic-wrapper">
             <img src="/images/icon.png" alt="Vous" className="profile-pic" />
-            <div className="wave"></div>
+            {localSpeaking && <div className="wave" />}
           </div>
           <span className="name">Vous</span>
         </div>
 
         <div className="divider" />
 
+        {/* Remote card */}
         <div className="video-card">
+          {remoteMuted && (
+            <div className="mute-indicator remote">
+              <MicOffIcon fontSize="small" /> Muet
+            </div>
+          )}
           <div className="pic-wrapper">
-            <img src="/images/icon.png" alt="Vous" className="profile-pic" />
-            {localSpeaking && <div className="wave"></div>}
+            <img
+              src="/images/icon.png"
+              alt="Interlocuteur"
+              className="profile-pic"
+            />
+            {remoteSpeaking && <div className="wave" />}
           </div>
-          <span className="name">Vous</span>
+          <span className="name">Interlocuteur</span>
         </div>
 
         <aside className="chat-panel">
@@ -116,20 +144,27 @@ export default function CallPage({ callId }) {
               sendMessage(msg);
               setMsg("");
             }}
+            isInitiator={isInitiator}
           />
         </aside>
       </main>
 
       <footer className="controls">
-        <button className="btn mute-btn" onClick={toggleMute}>
-          <i className="material-icons">mic</i>
+        <button className="icon-btn mute-btn" onClick={handleMute}>
+          {muted ? (
+            <MicOffIcon fontSize="large" />
+          ) : (
+            <MicIcon fontSize="large" />
+          )}
         </button>
-        <button className="btn hangup-btn" onClick={hangUp}>
-          <i className="material-icons">call_end</i>
+        <button className="icon-btn hangup-btn" onClick={hangUp}>
+          <CallEndIcon fontSize="large" />
         </button>
       </footer>
 
-      <audio ref={remoteAudioRef} autoPlay controls />
-      </div>
+      {status === "connected" && (
+        <audio ref={remoteAudioRef} autoPlay className="audio-player" />
+      )}
+    </div>
   );
 }

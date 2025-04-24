@@ -2,7 +2,6 @@
 input, button { padding: 0.5rem; margin: 0.5rem; }
 .status { margin-bottom: 1rem; }
 .controls { display: flex; gap: 1rem; margin-bottom: 1rem; }
-.chat-container { border: 1px solid #ccc; border-radius: 5px; width: 300px; max-height: 400px; display: flex; flex-direction: column; }
 .chat-messages { flex: 1; overflow-y: auto; padding: 0.5rem; }
 .message.local { text-align: right; }
 .message.peer { text-align: left; }
@@ -10,216 +9,389 @@ input, button { padding: 0.5rem; margin: 0.5rem; }
 .chat-input input { flex: 1; border: none; padding: 0.5rem; }
 .chat-input button { border: none; cursor: pointer; }
 
-/* src/index.css */
 
-/* index.css */
 
-/* index.css */
-
-/* Reset & font */
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body, html { width: 100%; height: 100%; font-family: "Google Sans", sans-serif; }
-
-/* Container principal */
-.call-app {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  background: #f1f3f4;
-  position: relative;
-}
-
-/* Header */
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 1.5rem;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-}
-.header-actions {
-  display: flex;
-  gap: 1rem;
-}
-.meeting-id {
-  font-size: 1rem;
-  color: #202124;
-}
-.copy-btn, .chat-toggle-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.4rem;
-}
-
-/* Écran appel entrant */
-.call-incoming {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-}
-
-.call-incoming .btn {
-    width: 120px;
-    text-align: center;
-    /* autres styles existants… */
+/* =============================
+   Global Reset & Base
+   ============================= */
+   * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body, html {
+    width: 100%;
+    height: 100%;
+    font-family: "Google Sans", sans-serif;
+    background: #121212;
+    color: #e8eaed;
   }
   
-.incoming-actions {
-  margin-top: 2rem;
-  display: flex;
-  gap: 2rem;
-}
-.btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  border: none;
-  border-radius: 24px;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-}
-.accept {
-  background: #0f9d58;
-  color: #fff;
-}
-.reject {
-  background: #db4437;
-  color: #fff;
-}
-
-/* Grille principale */
-.main-grid {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr 300px;
-  gap: 1rem;
-  padding: 1rem;
-  align-items: center;
-}
-
-/* Séparateur */
-.divider {
-  width: 1px;
-  height: 60%;
-  background: #ccc;
-  justify-self: center;
-}
-
-/* Cartes utilisateurs */
-.video-card {
-  background: #fff;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-.pic-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  width: 180px;
-  height: 180px;
-  margin-bottom: 0.5rem;
-}
-.profile-pic {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-  z-index: 1;
-}
-.wave {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 180px;
-  height: 180px;
-  border: 5px solid rgba(66,133,244,0.5);
-  border-radius: 50%;
-  transform: translate(-50%, -50%) scale(1);
-  animation: wave 1.8s infinite ease-out;
-}
-@keyframes wave {
-  0%   { transform: translate(-50%,-50%) scale(1);   opacity: 1; }
-  100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; }
-}
-.name {
-  font-size: 1rem;
-  color: #5f6368;
-}
-
-/* Chat panel */
-.chat-panel {
-  background: #f9f9f9;
-  border-radius: 12px;
-  border: 1px solid #dadce0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* Footer controles */
-.controls {
-  padding: 1rem;
-  display: flex;
-  justify-content: center;
-  gap: 2.5rem;
-  background: #fff;
-  box-shadow: 0 -1px 4px rgba(0,0,0,0.1);
-}
-.btn {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  border: none;
-  font-size: 1.6rem;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.hangup-btn {
-  background: #db4437;
-  color: #fff;
-}
-.mute-btn {
-  background: #fff;
-  color: #5f6368;
-  border: 1px solid #ccc;
-}
-
-/* Responsive mobile */
-@media (max-width: 768px) {
-  .main-grid {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
+  /* =============================
+     CallPage Container & Theme
+     ============================= */
+  .call-app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: #202124;
   }
-  .chat-panel {
+  
+  /* =============================
+     Header
+     ============================= */
+     .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 1rem;      /* réduit la hauteur */
+        background: #303134;
+      }
+      .meeting-id {
+        font-size: 1rem;
+        color: #e8eaed;
+        font-weight: 500;
+      }
+      .header-actions .icon-btn {
+        background: transparent;
+        border: none;
+        color: #e8eaed;
+        cursor: pointer;
+        padding: 0.4rem;          /* moins large */
+        border-radius: 50%;
+        display: none
+      }
+      .header-actions .icon-btn:hover {
+        background: rgba(255,255,255,0.1);
+      }
+
+  /* =============================
+   PrecallSplash Styles
+   ============================= */
+.splash-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: #121212;
+    text-align: center;
+    padding: 1rem;
+  }
+  .splash-container h2 {
+    margin-bottom: 2rem;
+    font-size: 1.5rem;
+  }
+  .join-btn {
+    padding: 1rem 2rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 24px;
+    background: #1a73e8;
+    color: #fff;
+    cursor: pointer;
+  }
+  .splash-step {
+    font-size: 1.1rem;
+  }
+  .splash-loader {
+    width: 80%;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    margin-top: 1rem;
+    overflow: hidden;
+  }
+  .splash-loader .bar {
+    height: 100%;
+    background: #1a73e8;
+    transition: width 0.3s;
+  }
+
+  /* =============================
+   CallPage Container & Theme
+   ============================= */
+.call-app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: #202124;
+  }
+
+  .audio-player {
     display: none;
   }
-  .chat-open .chat-panel {
+
+  /* =============================
+   Status Indicator sous le header
+   ============================= */
+.status-indicator {
+    text-align: center;
+    padding: 0.5rem 1rem;
+    color: #1a73e8;
+    font-weight: 500;
+    background: rgba(26,115,232,0.1);
+    margin: 0 1rem;
+    border-radius: 8px;
+  }
+  
+  
+  
+  /* =============================
+     Incoming Call Screen
+     ============================= */
+  .call-incoming {
     display: flex;
-    position: absolute;
-    top: 70px;
-    left: 1rem;
-    right: 1rem;
-    bottom: 80px;
-    background: #f9f9f9;
-    z-index: 100;
-    border-radius: 12px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
   }
-  .controls {
-    padding: 0.5rem;
+  .incoming-actions {
+    margin-top: 2rem;
+    display: flex;
+    gap: 1.5rem;
+  }
+  .call-incoming .btn {
+    width: 130px;
+    text-align: center;
+  }
+  .btn {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 24px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .accept { background: #1a73e8; color: #fff; }
+  .reject { background: #ea4335; color: #fff; }
+  
+  /* =============================
+     Main Grid & Divider
+     ============================= */
+  .main-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr 320px;
+    grid-template-rows: 1fr;
     gap: 1rem;
+    padding: 1rem;
+    align-items: center; /* center vertically */
   }
-}
+  .divider {
+    background: rgba(255,255,255,0.2); /* very light */
+    width: 1px;
+    height: 50%;
+    justify-self: center;
+  }
+  
+  /* =============================
+     Video Card & Profile Picture
+     =============================
+     Pure circle profiles
+     ============================= */
+  .video-card {
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center; /* center icons vertically */
+    padding: 0.5rem;
+    position: relative;
+  }
+
+  .mute-indicator {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(234, 67, 53, 0.9);
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    z-index: 2;
+  }
+
+  .pic-wrapper {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    margin-bottom: 0.5rem;
+  }
+  .profile-pic {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255,255,255,0.2);
+  }
+  .wave {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 160px;
+    height: 160px;
+    border: 4px solid rgba(66,133,244,0.6);
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(1);
+    animation: wave 1.8s infinite ease-out;
+  }
+  @keyframes wave {
+    0%   { transform: translate(-50%,-50%) scale(1);   opacity: 1; }
+    100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; }
+  }
+  .name {
+    font-size: 1rem;
+    color: #e8eaed;
+  }
+  
+ /* =============================
+   Chat Panel & Messages
+   ============================= */
+.chat-panel {
+    display: flex;
+    height: 100%;
+    background: #202124;
+    align-items: flex-end;
+  }
+  
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    border: 1px solid #3e3e3e;
+  }
+  
+  .chat-messages {
+    flex: 1;
+    padding: 0.75rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .message {
+    max-width: 80%;
+    border-radius: 8px;
+    padding: 0.5rem;
+  }
+  
+  .message.host {
+    align-self: flex-end;
+    background: #3c4043;
+  }
+  
+  .message.guest {
+    align-self: flex-start;
+    background: #424548;
+  }
+  
+  .msg-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    color: #c0c0c0;
+  }
+  
+  .msg-text {
+    font-size: 0.9rem;
+    color: #e8eaed;
+  }
+  
+  .chat-input {
+    display: flex;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  
+  .chat-input input {
+    flex: 1;
+    padding: 0.75rem;
+    background: #303134;
+    border: none;
+    color: #e8eaed;
+  }
+  
+  .chat-input button {
+    background: #3c4043;
+    border: none;
+    padding: 0 1rem;
+    color: #e8eaed;
+    cursor: pointer;
+  }
+  
+  /* =============================
+     Divider très léger
+     ============================= */
+  .divider {
+    width: 1px;
+    height: 50%;
+    background: rgba(255,255,255,0.1);
+    justify-self: center;
+  }
+  
+  
+  /* =============================
+     Footer Controls (no border around icons)
+     ============================= */
+  .controls {
+    padding: 1rem;
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    background: #303134;
+  }
+  .controls .icon-btn {
+    background: transparent;
+    border: none;
+    color: #e8eaed;
+    cursor: pointer;
+    padding: 0.75rem;
+    border-radius: 50%;
+  }
+  .controls .icon-btn:hover {
+    background: rgba(255,255,255,0.1);
+  }
+  .hangup-btn .MuiSvgIcon-root { color: #ea4335 !important; }
+  .mute-btn .MuiSvgIcon-root { color: #e8eaed !important; }
+  
+  /* =============================
+     Audio Player (hidden)
+     ============================= */
+  .audio-player { display: none; }
+  
+  /* =============================
+     Responsive Mobile
+     ============================= */
+  @media (max-width: 768px) {
+    .header-actions .icon-btn {
+       
+        display: block
+      }
+    .header-actions .icon-btn:nth-child(2) {
+        display: none;
+      }
+    .main-grid {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto;
+    }
+    .chat-panel { display: none; }
+    .chat-open .chat-panel {
+      display: flex;
+      position: absolute;
+      top: 70px;
+      left: 1rem;
+      right: 1rem;
+      bottom: 80px;
+      background: #202124;
+      z-index: 100;
+      border-radius: 12px;
+    }
+    .controls { gap: 1rem; }
+  }
+  

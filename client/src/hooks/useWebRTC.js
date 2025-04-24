@@ -5,6 +5,7 @@ export default function useWebRTC(
   callId,
   { timeout = 30000, start = true, isInitiator = false }
 ) {
+  // --- refs & state ---
   const wsRef = useRef();
   const pcRef = useRef();
   const dataChannelRef = useRef();
@@ -12,170 +13,65 @@ export default function useWebRTC(
   const localStreamRef = useRef();
 
   const [status, setStatus] = useState("waiting");
+  const statusRef = useRef(status);
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
   const [chatMessages, setChatMessages] = useState([]);
   const [localSpeaking, setLocalSpeaking] = useState(false);
   const [remoteSpeaking, setRemoteSpeaking] = useState(false);
+  const [remoteMuted, setRemoteMuted] = useState(false);
 
+  // --- SIGNALING WS SETUP ---
   useEffect(() => {
     if (!start) return;
-    // open WebSocket to signaling server
     const serverUrl = process.env.REACT_APP_SERVER_URL;
     wsRef.current = new WebSocket(
       `${serverUrl.replace(/^http/, "ws")}?roomId=${callId}`
     );
-
     wsRef.current.onopen = () => console.log("WS open");
     wsRef.current.onclose = () => console.log("WS closed");
 
     wsRef.current.onmessage = async ({ data }) => {
-      // normalize to string
-      const text = typeof data === "string" ? data : data.toString();
       let msg;
       try {
-        msg = JSON.parse(text);
+        msg = JSON.parse(data);
       } catch {
-        return; // ignore non-JSON blobs
+        return;
       }
 
       switch (msg.type) {
         case "room-status":
-          if (msg.peers === 2 && status === "waiting") {
-            // seul l'initiateur fera l'offre, l'autre préparera sans offrir
+          if (msg.peers === 2 && statusRef.current === "waiting") {
             await initiateCall(isInitiator);
           }
           break;
-
         case "offer":
           await pcRef.current.setRemoteDescription(msg.offer);
-          const answer = await pcRef.current.createAnswer();
-          await pcRef.current.setLocalDescription(answer);
-          wsRef.current.send(JSON.stringify({ type: "answer", answer }));
+          {
+            const answer = await pcRef.current.createAnswer();
+            await pcRef.current.setLocalDescription(answer);
+            wsRef.current.send(JSON.stringify({ type: "answer", answer }));
+          }
           break;
-
         case "answer":
           await pcRef.current.setRemoteDescription(msg.answer);
           break;
-
         case "candidate":
           await pcRef.current.addIceCandidate(msg.candidate);
           break;
-
         case "peer-left":
           setStatus("peer-left");
+          break;
+        case "call-ended":
+          setStatus("ended");
           break;
       }
     };
 
-    async function initiateCall(isInitiator) {
-      setStatus("connecting");
-      // create peer connection
-      pcRef.current = new RTCPeerConnection({
-        iceServers: [{ urls: process.env.REACT_APP_STUN_SERVER }],
-      });
-
-      // get local audio stream
-      localStreamRef.current = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
-
-      // --- LOCAL SPEECH DETECTION ---
-      const audioCtxLocal = new (window.AudioContext ||
-        window.webkitAudioContext)();
-      // ensure AudioContext is running
-      audioCtxLocal.resume().catch(() => {});
-      const analyserLocal = audioCtxLocal.createAnalyser();
-      const srcLocal = audioCtxLocal.createMediaStreamSource(
-        localStreamRef.current
-      );
-      srcLocal.connect(analyserLocal);
-      analyserLocal.fftSize = 256;
-      const dataArrayLocal = new Uint8Array(analyserLocal.frequencyBinCount);
-
-      function detectLocal() {
-        analyserLocal.getByteFrequencyData(dataArrayLocal);
-        const avg =
-          dataArrayLocal.reduce((sum, v) => sum + v, 0) / dataArrayLocal.length;
-        setLocalSpeaking(avg > 30);
-        requestAnimationFrame(detectLocal);
-      }
-      detectLocal();
-
-      // add tracks to peer
-      localStreamRef.current
-        .getTracks()
-        .forEach((t) => pcRef.current.addTrack(t, localStreamRef.current));
-
-      // --- REMOTE SPEECH DETECTION on first track + force playback ---
-      pcRef.current.ontrack = ({ streams: [stream] }) => {
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = stream;
-          // force playback in case autoplay is blocked
-          remoteAudioRef.current
-            .play()
-            .catch((err) => console.warn("Lecture auto bloquée :", err));
-        }
-
-        // once remote stream arrives, set up analyser once
-        if (!remoteSpeaking) {
-          const audioCtxRemote = new (window.AudioContext ||
-            window.webkitAudioContext)();
-          audioCtxRemote.resume().catch(() => {});
-          const analyserRemote = audioCtxRemote.createAnalyser();
-          const srcRemote = audioCtxRemote.createMediaStreamSource(stream);
-          srcRemote.connect(analyserRemote);
-          analyserRemote.fftSize = 256;
-          const dataArrayRemote = new Uint8Array(
-            analyserRemote.frequencyBinCount
-          );
-
-          function detectRemote() {
-            analyserRemote.getByteFrequencyData(dataArrayRemote);
-            const avgR =
-              dataArrayRemote.reduce((sum, v) => sum + v, 0) /
-              dataArrayRemote.length;
-            setRemoteSpeaking(avgR > 30);
-            requestAnimationFrame(detectRemote);
-          }
-          detectRemote();
-        }
-      };
-
-      // set up data channel
-      if (isInitiator) {
-        dataChannelRef.current = pcRef.current.createDataChannel("chat");
-        setupDataChannel();
-      } else {
-        pcRef.current.ondatachannel = ({ channel }) => {
-          dataChannelRef.current = channel;
-          setupDataChannel();
-        };
-      }
-
-      // ICE candidates
-      pcRef.current.onicecandidate = ({ candidate }) => {
-        if (candidate)
-          wsRef.current.send(JSON.stringify({ type: "candidate", candidate }));
-      };
-
-      // offer/answer exchange
-      if (isInitiator) {
-        const offer = await pcRef.current.createOffer();
-        await pcRef.current.setLocalDescription(offer);
-        wsRef.current.send(JSON.stringify({ type: "offer", offer }));
-      }
-
-      setStatus("connected");
-    }
-
-    function setupDataChannel() {
-      dataChannelRef.current.onopen = () => console.log("DataChannel open");
-      dataChannelRef.current.onmessage = ({ data }) =>
-        setChatMessages((prev) => [...prev, { sender: "peer", text: data }]);
-    }
-
-    // timeout if not connected
     const timer = setTimeout(() => {
-      if (status !== "connected") setStatus("timeout");
+      if (statusRef.current !== "connected") setStatus("timeout");
     }, timeout);
 
     return () => {
@@ -183,8 +79,111 @@ export default function useWebRTC(
       wsRef.current?.close();
       pcRef.current?.close();
     };
-  }, [callId, start]);
+  }, [callId, start, isInitiator]);
 
+  // --- PEER CONNECTION SETUP ---
+  async function initiateCall(isInitiator) {
+    setStatus("connecting");
+    pcRef.current = new RTCPeerConnection({
+      iceServers: [{ urls: process.env.REACT_APP_STUN_SERVER }],
+    });
+
+    // local audio + speech detection
+    localStreamRef.current = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+    });
+    const audioCtxL = new (window.AudioContext || window.webkitAudioContext)();
+    const analyserL = audioCtxL.createAnalyser();
+    const srcL = audioCtxL.createMediaStreamSource(localStreamRef.current);
+    srcL.connect(analyserL);
+    analyserL.fftSize = 256;
+    const dataL = new Uint8Array(analyserL.frequencyBinCount);
+    (function detectLocal() {
+      analyserL.getByteFrequencyData(dataL);
+      setLocalSpeaking(
+        dataL.reduce((sum, v) => sum + v, 0) / dataL.length > 30
+      );
+      requestAnimationFrame(detectLocal);
+    })();
+
+    localStreamRef.current
+      .getTracks()
+      .forEach((t) => pcRef.current.addTrack(t, localStreamRef.current));
+
+    // remote audio + speech & mute detection
+    pcRef.current.ontrack = ({ streams: [stream] }) => {
+      if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream;
+
+      // watch track mute/unmute events
+      const rt = stream.getAudioTracks()[0];
+      if (rt) {
+        rt.onmute = () => setRemoteMuted(true);
+        rt.onunmute = () => setRemoteMuted(false);
+      }
+
+      if (!remoteSpeaking) {
+        const audioCtxR = new (window.AudioContext ||
+          window.webkitAudioContext)();
+        const analyserR = audioCtxR.createAnalyser();
+        const srcR = audioCtxR.createMediaStreamSource(stream);
+        srcR.connect(analyserR);
+        analyserR.fftSize = 256;
+        const dataR = new Uint8Array(analyserR.frequencyBinCount);
+        (function detectRemote() {
+          analyserR.getByteFrequencyData(dataR);
+          setRemoteSpeaking(
+            dataR.reduce((sum, v) => sum + v, 0) / dataR.length > 30
+          );
+          requestAnimationFrame(detectRemote);
+        })();
+      }
+    };
+
+    // data channel for chat + mute signaling
+    if (isInitiator) {
+      dataChannelRef.current = pcRef.current.createDataChannel("chat");
+      setupDataChannel();
+    } else {
+      pcRef.current.ondatachannel = ({ channel }) => {
+        dataChannelRef.current = channel;
+        setupDataChannel();
+      };
+    }
+
+    pcRef.current.onicecandidate = ({ candidate }) => {
+      if (candidate)
+        wsRef.current.send(JSON.stringify({ type: "candidate", candidate }));
+    };
+
+    if (isInitiator) {
+      const offer = await pcRef.current.createOffer();
+      await pcRef.current.setLocalDescription(offer);
+      wsRef.current.send(JSON.stringify({ type: "offer", offer }));
+    }
+
+    setStatus("connected");
+  }
+
+  function setupDataChannel() {
+    dataChannelRef.current.onopen = () => console.log("DataChannel open");
+    dataChannelRef.current.onmessage = ({ data }) => {
+      let parsed;
+      try {
+        parsed = JSON.parse(data);
+      } catch {
+        /* not JSON? */
+      }
+      // handle mute signaling
+      if (parsed && parsed.type === "mute") {
+        setRemoteMuted(parsed.muted);
+        return;
+      }
+      // otherwise chat message
+      setChatMessages((prev) => [...prev, { sender: "peer", text: data }]);
+    };
+  }
+
+  // --- PUBLIC API ---
   function sendMessage(text) {
     if (dataChannelRef.current?.readyState === "open") {
       dataChannelRef.current.send(text);
@@ -193,16 +192,29 @@ export default function useWebRTC(
   }
 
   function toggleMute() {
-    if (localStreamRef.current) {
-      const track = localStreamRef.current.getAudioTracks()[0];
-      track.enabled = !track.enabled;
+    const track = localStreamRef.current?.getAudioTracks()[0];
+    if (!track) return;
+    // flip track.enabled
+    track.enabled = !track.enabled;
+    // only the invitee sends their mute state to the host
+    if (!isInitiator && dataChannelRef.current?.readyState === "open") {
+      dataChannelRef.current.send(
+        JSON.stringify({ type: "mute", muted: !track.enabled })
+      );
     }
   }
 
   function hangUp() {
-    wsRef.current.close();
-    pcRef.current.close();
+    if (isInitiator) {
+      wsRef.current.send(JSON.stringify({ type: "end-call" }));
+    }
     setStatus("ended");
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+    setTimeout(() => {
+      wsRef.current?.close();
+      pcRef.current?.close();
+    }, 100);
   }
 
   return {
@@ -214,5 +226,6 @@ export default function useWebRTC(
     hangUp,
     localSpeaking,
     remoteSpeaking,
+    remoteMuted,
   };
 }

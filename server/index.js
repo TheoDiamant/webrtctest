@@ -60,20 +60,33 @@ wss.on("connection", (ws, req) => {
     c.send(JSON.stringify({ type: "room-status", peers: rooms[callId].length }))
   );
 
-// server/index.js (dans wss.on('connection'))
-ws.on('message', msg => {
-    // msg peut être string ou Buffer
-    const text = typeof msg === 'string' ? msg : msg.toString();
+  // server/index.js (dans wss.on('connection'))
+  ws.on("message", (msg) => {
     let data;
     try {
-      data = JSON.parse(text);
+      data = JSON.parse(msg);
     } catch {
-      return; // ignore tout ce qui n'est pas du JSON valide
+      return;
     }
-    if (['offer','answer','candidate'].includes(data.type)) {
-      rooms[callId].forEach(client => {
+
+    // Si l’hôte raccroche :
+    if (data.type === "end-call") {
+      // prévenir tout le monde que l’appel est terminé
+      rooms[callId]?.forEach((client) => {
+        if (client.readyState === client.OPEN) {
+          client.send(JSON.stringify({ type: "call-ended" }));
+        }
+      });
+      // supprimer la room pour empêcher toute reconnexion
+      delete rooms[callId];
+      return;
+    }
+
+    // votre logique existante pour offer/answer/candidate…
+    if (["offer", "answer", "candidate"].includes(data.type)) {
+      rooms[callId].forEach((client) => {
         if (client !== ws && client.readyState === client.OPEN) {
-          client.send(text);  // envoie toujours du texte
+          client.send(msg);
         }
       });
     }
