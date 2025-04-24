@@ -4,15 +4,16 @@ const express = require("express");
 const cors = require("cors");
 const http = require("http");
 const path = require("path");
-const { WebSocketServer } = require("ws");
+const WebSocket = require("ws");
+const { WebSocketServer } = WebSocket;
 const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 
-// CORS (autorise ton front Render et localhost)
+// CORS (autorise localhost et Render)
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://webrtctest-ux3c.onrender.com", // **le bon domaine** ici
+  "https://webrtctest-ux3c.onrender.com",
 ];
 app.use(
   cors({
@@ -26,7 +27,7 @@ app.use(
 app.options("*", cors());
 app.use(express.json());
 
-// --- ROUTE API protégée ---
+// Auth (Basic)
 function auth(req, res, next) {
   const h = req.headers.authorization;
   if (!h) return res.status(401).send("Unauthorized");
@@ -42,11 +43,11 @@ app.post("/create-call", auth, (req, res) => {
   res.json({ callId: uuidv4() });
 });
 
-// --- WEBSOCKET SIGNALING ---
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 const rooms = {};
 
+// server/index.js
 wss.on("connection", (ws, req) => {
   const params = new URLSearchParams(req.url.replace(/^.*\?/, ""));
   const callId = params.get("roomId");
@@ -55,60 +56,54 @@ wss.on("connection", (ws, req) => {
   rooms[callId] = rooms[callId] || [];
   rooms[callId].push(ws);
 
-  // informe du nb de pairs
+  // informer du nb de pairs
   rooms[callId].forEach((c) =>
     c.send(JSON.stringify({ type: "room-status", peers: rooms[callId].length }))
   );
 
-  // server/index.js (dans wss.on('connection'))
   ws.on("message", (msg) => {
-    let data;
+    // msg est un Buffer ou une string, on parse d’abord
+    let d;
     try {
-      data = JSON.parse(msg);
+      // si Buffer, toString() renvoie bien le JSON textuel
+      const text = typeof msg === "string" ? msg : msg.toString();
+      d = JSON.parse(text);
     } catch {
       return;
     }
 
-    // Si l’hôte raccroche :
-    if (data.type === "end-call") {
-      // prévenir tout le monde que l’appel est terminé
-      rooms[callId]?.forEach((client) => {
-        if (client.readyState === client.OPEN) {
-          client.send(JSON.stringify({ type: "call-ended" }));
-        }
-      });
-      // supprimer la room pour empêcher toute reconnexion
-      delete rooms[callId];
-      return;
-    }
+    // types qu’on relaie
+    if (["offer", "answer", "candidate", "end-call"].includes(d.type)) {
+      rooms[callId].forEach((c) => {
+        if (c === ws || c.readyState !== WebSocket.OPEN) return;
 
-    // votre logique existante pour offer/answer/candidate…
-    if (["offer", "answer", "candidate"].includes(data.type)) {
-      rooms[callId].forEach((client) => {
-        if (client !== ws && client.readyState === client.OPEN) {
-          client.send(msg);
+        if (d.type === "end-call") {
+          // on notifie fin d’appel
+          c.send(JSON.stringify({ type: "call-ended" }));
+        } else {
+          // on renvoie TOUJOURS une string JSON
+          c.send(JSON.stringify(d));
         }
       });
     }
   });
+
   ws.on("close", () => {
     rooms[callId] = rooms[callId].filter((c) => c !== ws);
     rooms[callId].forEach((c) => {
-      if (c.readyState === c.OPEN)
+      if (c.readyState === WebSocket.OPEN) {
         c.send(JSON.stringify({ type: "peer-left" }));
+      }
     });
   });
 });
 
-// --- SERVIR LE BUILD REACT ---
+// servir le build React
 const buildPath = path.join(__dirname, "../client/build");
 app.use(express.static(buildPath));
-
-// Fallback pour toutes les routes non-API : renvoie index.html
 app.get("*", (req, res) => {
   res.sendFile(path.join(buildPath, "index.html"));
 });
 
-// --- LANCEMENT DU SERVEUR ---
 const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => console.log(`Server listening on port ${PORT}`));

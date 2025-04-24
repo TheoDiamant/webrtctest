@@ -45,8 +45,7 @@ export default function CallPage({ callId }) {
       window.location.href = "/";
     }
     if (status === "connected") {
-      const ctx = new (window.AudioContext ||
-        window.webkitAudioContext)();
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const osc = ctx.createOscillator();
       osc.type = "sine";
       osc.frequency.value = 440;
@@ -78,11 +77,7 @@ export default function CallPage({ callId }) {
       <header className="header">
         <span className="meeting-id">ID : {callId}</span>
         <div className="header-actions">
-         
-          <button
-            className="icon-btn"
-            onClick={() => setChatOpen((o) => !o)}
-          >
+          <button className="icon-btn" onClick={() => setChatOpen((o) => !o)}>
             <ChatBubbleOutlineIcon fontSize="small" />
           </button>
         </div>
@@ -162,9 +157,7 @@ export default function CallPage({ callId }) {
         </button>
       </footer>
 
-      {status === "connected" && (
-        <audio ref={remoteAudioRef} autoPlay className="audio-player" />
-      )}
+      <audio ref={remoteAudioRef} autoPlay className="audio-player" />
     </div>
   );
 }

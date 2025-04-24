@@ -119,7 +119,13 @@ input, button { padding: 0.5rem; margin: 0.5rem; }
   }
 
   .audio-player {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    top: 0;
+    left: 0;
+    pointer-events: none;
   }
 
   /* =============================
