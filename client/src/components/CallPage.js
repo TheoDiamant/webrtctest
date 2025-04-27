@@ -157,7 +157,7 @@ export default function CallPage({ callId }) {
         </button>
       </footer>
 
-      <audio ref={remoteAudioRef} autoPlay playsInline className="audio-player" />
+      <audio ref={remoteAudioRef} autoPlay className="audio-player" />
     </div>
   );
 }
