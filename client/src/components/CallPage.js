@@ -30,6 +30,7 @@ export default function CallPage({ callId }) {
     localSpeaking,
     remoteSpeaking,
     remoteMuted,
+    hasRemoteStream,
   } = useWebRTC(callId, {
     start: splashDone,
     timeout: 30000,
@@ -157,7 +158,9 @@ export default function CallPage({ callId }) {
         </button>
       </footer>
 
-      <audio ref={remoteAudioRef} autoPlay className="audio-player" />
+      {hasRemoteStream && (
+        <audio ref={remoteAudioRef} autoPlay className="audio-player" />
+      )}
     </div>
   );
 }

@@ -22,6 +22,7 @@ export default function useWebRTC(
   const [remoteSpeaking, setRemoteSpeaking] = useState(false);
   const [remoteMuted, setRemoteMuted] = useState(false);
   const [isChannelOpen, setIsChannelOpen] = useState(false);
+  const [hasRemoteStream, setHasRemoteStream] = useState(false);
 
   // 1) Signaling via WebSocket
   // 1) Signaling via WebSocket
@@ -55,10 +56,20 @@ export default function useWebRTC(
       switch (msg.type) {
         case "room-status":
           console.log("room-status:", msg.peers);
-          if (msg.peers === 2 && statusRef.current === "waiting") {
+          if (msg.peers === 1 && statusRef.current === "connected") {
+            console.log("Peer left → closing PC");
+            setStatus("peer-left");
+            pcRef.current?.close();
+            pcRef.current = null;
+            setIsChannelOpen(false);
+            if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+          } else if (msg.peers === 2 && statusRef.current !== "connected") {
+            console.log("Peer joined → restarting negotiation");
+            setStatus("connecting");
             await initiateCall(isInitiator);
           }
           break;
+
         case "offer":
           console.log("received OFFER", msg.offer);
           await pcRef.current.setRemoteDescription(msg.offer);
@@ -139,7 +150,10 @@ export default function useWebRTC(
     // 2.4) réception et affichage de l’audio distant
     pcRef.current.ontrack = ({ streams: [stream] }) => {
       console.log("%cPC ontrack →", "color:teal;", stream);
-      if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream;
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = stream;
+        +setHasRemoteStream(true);
+      }
 
       const rt = stream.getAudioTracks()[0];
       if (rt) {
@@ -260,5 +274,6 @@ export default function useWebRTC(
     remoteSpeaking,
     remoteMuted,
     isChannelOpen,
+    hasRemoteStream
   };
 }
