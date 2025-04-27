@@ -24,6 +24,7 @@ export default function useWebRTC(
   const [isChannelOpen, setIsChannelOpen] = useState(false);
 
   // 1) Signaling via WebSocket
+  // 1) Signaling via WebSocket
   useEffect(() => {
     if (!start) return;
 
@@ -37,17 +38,11 @@ export default function useWebRTC(
       console.log("%cWS closed", "color:gray;font-weight:bold;", new Date());
 
     wsRef.current.onmessage = async ({ data }) => {
-      // 1.1) Convertir Blob → texte
-      let text;
-      if (data instanceof Blob) {
-        text = await data.text();
-        console.log("%cWS ← [blob]", "color:purple;", text);
-      } else {
-        text = data;
-        console.log("%cWS ←", "color:purple;", text);
-      }
+      // Blob → texte
+      let text = data instanceof Blob ? await data.text() : data;
+      console.log("%cWS ←", "color:purple;", text);
 
-      // 1.2) Parser en JSON
+      // JSON.parse
       let msg;
       try {
         msg = JSON.parse(text);
@@ -57,53 +52,45 @@ export default function useWebRTC(
       }
       console.log("%cSignal→", "color:blue;", msg.type, msg);
 
-      // 1.3) Réagir aux différents types de signal
       switch (msg.type) {
         case "room-status":
-          console.log("room-status:", msg.peers, "peerCount");
+          console.log("room-status:", msg.peers);
           if (msg.peers === 2 && statusRef.current === "waiting") {
             await initiateCall(isInitiator);
           }
           break;
-
         case "offer":
           console.log("received OFFER", msg.offer);
           await pcRef.current.setRemoteDescription(msg.offer);
           {
             const answer = await pcRef.current.createAnswer();
-            console.log("created ANSWER", answer);
             await pcRef.current.setLocalDescription(answer);
             wsRef.current.send(JSON.stringify({ type: "answer", answer }));
           }
           break;
-
         case "answer":
           console.log("received ANSWER", msg.answer);
           await pcRef.current.setRemoteDescription(msg.answer);
           break;
-
         case "candidate":
           console.log("received CANDIDATE", msg.candidate);
           await pcRef.current.addIceCandidate(msg.candidate);
           break;
-
         case "peer-left":
           console.log("peer-left");
           setStatus("peer-left");
           break;
-
         case "call-ended":
           console.log("call-ended");
           setStatus("ended");
           break;
-
         default:
           break;
       }
     };
 
+    // cleanup : on ferme juste les connexions
     return () => {
-      clearTimeout(timer);
       wsRef.current?.close();
       pcRef.current?.close();
     };
@@ -161,8 +148,8 @@ export default function useWebRTC(
       }
 
       if (!remoteSpeaking) {
-        const audioCtxR =
-          new (window.AudioContext || window.webkitAudioContext)();
+        const audioCtxR = new (window.AudioContext ||
+          window.webkitAudioContext)();
         const analyserR = audioCtxR.createAnalyser();
         const srcR = audioCtxR.createMediaStreamSource(stream);
         srcR.connect(analyserR);
