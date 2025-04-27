@@ -22,7 +22,6 @@ export default function useWebRTC(
   const [remoteSpeaking, setRemoteSpeaking] = useState(false);
   const [remoteMuted, setRemoteMuted] = useState(false);
   const [isChannelOpen, setIsChannelOpen] = useState(false);
-  const [hasRemoteStream, setHasRemoteStream] = useState(false);
 
   // 1) Signaling via WebSocket
   // 1) Signaling via WebSocket
@@ -73,6 +72,12 @@ export default function useWebRTC(
         case "offer":
           console.log("received OFFER", msg.offer);
           await pcRef.current.setRemoteDescription(msg.offer);
+          // -- on force sendrecv sur l’audio, sinon l’answer peut être recvonly --
+          pcRef.current.getTransceivers().forEach((t) => {
+            if (t.receiver.track?.kind === "audio") {
+              t.direction = "sendrecv";
+            }
+          });
           {
             const answer = await pcRef.current.createAnswer();
             await pcRef.current.setLocalDescription(answer);
@@ -152,7 +157,6 @@ export default function useWebRTC(
       console.log("%cPC ontrack →", "color:teal;", stream);
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
-        +setHasRemoteStream(true);
       }
 
       const rt = stream.getAudioTracks()[0];
@@ -274,6 +278,5 @@ export default function useWebRTC(
     remoteSpeaking,
     remoteMuted,
     isChannelOpen,
-    hasRemoteStream
   };
 }
