@@ -55,17 +55,18 @@ export default function useWebRTC(
       switch (msg.type) {
         case "room-status":
           console.log("room-status:", msg.peers);
-          if (msg.peers === 1 && statusRef.current === "connected") {
-            console.log("Peer left → closing PC");
+          if (msg.peers === 2) {
+            // à chaque fois qu’on atteint 2 peers, on reconstruit la connexion
+            console.log("Deux peers, (re)création du PeerConnection");
+            pcRef.current?.close();
+            await initiateCall(isInitiator);
+          } else {
+            // peer left
+            console.log("Peer left → nettoyage");
             setStatus("peer-left");
             pcRef.current?.close();
-            pcRef.current = null;
-            setIsChannelOpen(false);
             if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
-          } else if (msg.peers === 2 && statusRef.current !== "connected") {
-            console.log("Peer joined → restarting negotiation");
-            setStatus("connecting");
-            await initiateCall(isInitiator);
+            setIsChannelOpen(false);
           }
           break;
 
