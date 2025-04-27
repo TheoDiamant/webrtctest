@@ -16,6 +16,7 @@ export default function useWebRTC(
   const dataChannelRef = useRef();
   const remoteAudioRef = useRef();
   const localStreamRef = useRef();
+  const remoteStreamRef = useRef(new MediaStream());
 
   const [chatMessages, setChatMessages] = useState([]);
   const [localSpeaking, setLocalSpeaking] = useState(false);
@@ -24,25 +25,19 @@ export default function useWebRTC(
   const [isChannelOpen, setIsChannelOpen] = useState(false);
 
   // 1) Signaling via WebSocket
-  // 1) Signaling via WebSocket
   useEffect(() => {
     if (!start) return;
 
-    const serverUrl = process.env.REACT_APP_SERVER_URL;
     wsRef.current = new WebSocket(
-      `${serverUrl.replace(/^http/, "ws")}?roomId=${callId}`
+      `${process.env.REACT_APP_SERVER_URL.replace(/^http/, "ws")}?roomId=${callId}`
     );
     wsRef.current.onopen = () =>
-      console.log("%cWS open", "color:green;font-weight:bold;", new Date());
+      console.log("WS open", new Date());
     wsRef.current.onclose = () =>
-      console.log("%cWS closed", "color:gray;font-weight:bold;", new Date());
+      console.log("WS closed", new Date());
 
     wsRef.current.onmessage = async ({ data }) => {
-      // Blob → texte
-      let text = data instanceof Blob ? await data.text() : data;
-      console.log("%cWS ←", "color:purple;", text);
-
-      // JSON.parse
+      const text = data instanceof Blob ? await data.text() : data;
       let msg;
       try {
         msg = JSON.parse(text);
@@ -50,34 +45,40 @@ export default function useWebRTC(
         console.warn("WS: message non JSON reçu", text);
         return;
       }
-      console.log("%cSignal→", "color:blue;", msg.type, msg);
 
       switch (msg.type) {
         case "room-status":
           console.log("room-status:", msg.peers);
-          if (msg.peers === 2) {
-            // à chaque fois qu’on atteint 2 peers, on reconstruit la connexion
-            console.log("Deux peers, (re)création du PeerConnection");
-            pcRef.current?.close();
+          if (msg.peers === 2 && statusRef.current === "waiting") {
+            // première arrivée du peer
             await initiateCall(isInitiator);
-          } else {
-            // peer left
+          } else if (
+            msg.peers === 2 &&
+            statusRef.current === "peer-left"
+          ) {
+            // peer revient après être parti
+            setStatus("connecting");
+            await initiateCall(isInitiator);
+          } else if (
+            msg.peers === 1 &&
+            statusRef.current === "connected"
+          ) {
+            // peer a quitté
             console.log("Peer left → nettoyage");
             setStatus("peer-left");
             pcRef.current?.close();
-            if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+            remoteStreamRef.current = new MediaStream();
+            if (remoteAudioRef.current) {
+              remoteAudioRef.current.srcObject = null;
+            }
             setIsChannelOpen(false);
           }
           break;
 
         case "offer":
-          console.log("received OFFER", msg.offer);
           await pcRef.current.setRemoteDescription(msg.offer);
-          // -- on force sendrecv sur l’audio, sinon l’answer peut être recvonly --
           pcRef.current.getTransceivers().forEach((t) => {
-            if (t.receiver.track?.kind === "audio") {
-              t.direction = "sendrecv";
-            }
+            if (t.receiver.track?.kind === "audio") t.direction = "sendrecv";
           });
           {
             const answer = await pcRef.current.createAnswer();
@@ -85,28 +86,28 @@ export default function useWebRTC(
             wsRef.current.send(JSON.stringify({ type: "answer", answer }));
           }
           break;
+
         case "answer":
-          console.log("received ANSWER", msg.answer);
           await pcRef.current.setRemoteDescription(msg.answer);
           break;
+
         case "candidate":
-          console.log("received CANDIDATE", msg.candidate);
           await pcRef.current.addIceCandidate(msg.candidate);
           break;
+
         case "peer-left":
-          console.log("peer-left");
           setStatus("peer-left");
           break;
+
         case "call-ended":
-          console.log("call-ended");
           setStatus("ended");
           break;
+
         default:
           break;
       }
     };
 
-    // cleanup : on ferme juste les connexions
     return () => {
       wsRef.current?.close();
       pcRef.current?.close();
@@ -115,152 +116,104 @@ export default function useWebRTC(
 
   // 2) WebRTC peer connection & media
   async function initiateCall(isInitiator) {
-    console.log("%c⏱ initiateCall()", "color:orange;", { isInitiator });
     setStatus("connecting");
-
     pcRef.current = new RTCPeerConnection({
       iceServers: [{ urls: process.env.REACT_APP_STUN_SERVER }],
     });
-    pcRef.current.onconnectionstatechange = () =>
-      console.log("PC connectionState:", pcRef.current.connectionState);
     pcRef.current.oniceconnectionstatechange = () =>
-      console.log("PC iceConnectionState:", pcRef.current.iceConnectionState);
+      console.log("ICE:", pcRef.current.iceConnectionState);
+    pcRef.current.onconnectionstatechange = () =>
+      console.log("PC:", pcRef.current.connectionState);
 
-    // 2.1) récupérer l’audio local
+    // 2.1) getUserMedia
     localStreamRef.current = await navigator.mediaDevices.getUserMedia({
       audio: true,
     });
-    console.log("got localStream:", localStreamRef.current);
+    localStreamRef.current.getTracks().forEach((t) =>
+      pcRef.current.addTrack(t, localStreamRef.current)
+    );
 
-    // 2.2) détection de voix locale (animation)
-    const audioCtxL = new (window.AudioContext || window.webkitAudioContext)();
-    const analyserL = audioCtxL.createAnalyser();
-    const srcL = audioCtxL.createMediaStreamSource(localStreamRef.current);
-    srcL.connect(analyserL);
-    analyserL.fftSize = 256;
-    const dataL = new Uint8Array(analyserL.frequencyBinCount);
-    (function detectLocal() {
-      analyserL.getByteFrequencyData(dataL);
-      setLocalSpeaking(
-        dataL.reduce((sum, v) => sum + v, 0) / dataL.length > 30
-      );
-      requestAnimationFrame(detectLocal);
-    })();
-
-    // 2.3) ajout des pistes au PeerConnection
-    localStreamRef.current.getTracks().forEach((t) => {
-      console.log("addTrack:", t.kind);
-      pcRef.current.addTrack(t, localStreamRef.current);
-    });
-
-    // 2.4) réception et affichage de l’audio distant
-    pcRef.current.ontrack = ({ streams: [stream] }) => {
-      console.log("%cPC ontrack →", "color:teal;", stream);
+    // 2.2) ajouter l’audio distant
+    pcRef.current.ontrack = (event) => {
+      // ajouter chaque piste au remoteStream
+      remoteStreamRef.current.addTrack(event.track);
       if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = stream;
+        remoteAudioRef.current.srcObject = remoteStreamRef.current;
       }
+      event.track.onmute = () => setRemoteMuted(true);
+      event.track.onunmute = () => setRemoteMuted(false);
 
-      const rt = stream.getAudioTracks()[0];
-      if (rt) {
-        rt.onmute = () => setRemoteMuted(true);
-        rt.onunmute = () => setRemoteMuted(false);
-      }
-
+      // animation voix distante
       if (!remoteSpeaking) {
-        const audioCtxR = new (window.AudioContext ||
+        const ctx = new (window.AudioContext ||
           window.webkitAudioContext)();
-        const analyserR = audioCtxR.createAnalyser();
-        const srcR = audioCtxR.createMediaStreamSource(stream);
-        srcR.connect(analyserR);
-        analyserR.fftSize = 256;
-        const dataR = new Uint8Array(analyserR.frequencyBinCount);
-        (function detectRemote() {
-          analyserR.getByteFrequencyData(dataR);
+        const analyser = ctx.createAnalyser();
+        ctx.createMediaStreamSource(remoteStreamRef.current).connect(analyser);
+        analyser.fftSize = 256;
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        (function detect() {
+          analyser.getByteFrequencyData(data);
           setRemoteSpeaking(
-            dataR.reduce((sum, v) => sum + v, 0) / dataR.length > 30
+            data.reduce((s, v) => s + v, 0) / data.length > 30
           );
-          requestAnimationFrame(detectRemote);
+          requestAnimationFrame(detect);
         })();
       }
     };
 
-    // 3) DataChannel pour le chat
+    // 3) DataChannel chat
     if (isInitiator) {
-      console.log("creating DataChannel as initiator");
       dataChannelRef.current = pcRef.current.createDataChannel("chat");
       setupDataChannel();
     } else {
       pcRef.current.ondatachannel = ({ channel }) => {
-        console.log("ondatachannel → received channel", channel);
         dataChannelRef.current = channel;
         setupDataChannel();
       };
     }
 
-    // 4) échange ICE
+    // 4) ICE
     pcRef.current.onicecandidate = ({ candidate }) => {
-      console.log("onicecandidate → send", candidate);
-      if (candidate) {
+      if (candidate)
         wsRef.current.send(JSON.stringify({ type: "candidate", candidate }));
-      }
     };
 
-    // 5) negotiation offer/answer
+    // 5) Offer/Answer
     if (isInitiator) {
       const offer = await pcRef.current.createOffer();
-      console.log("created OFFER", offer);
       await pcRef.current.setLocalDescription(offer);
       wsRef.current.send(JSON.stringify({ type: "offer", offer }));
     }
 
     setStatus("connected");
-    console.log("status → connected");
   }
 
   function setupDataChannel() {
-    dataChannelRef.current.onopen = () => {
-      console.log("%cDataChannel open", "color:green;", dataChannelRef.current);
-      setIsChannelOpen(true);
-    };
-    dataChannelRef.current.onclose = () => {
-      console.log("%cDataChannel closed", "color:red;", dataChannelRef.current);
-      setIsChannelOpen(false);
-    };
-    dataChannelRef.current.onmessage = ({ data }) => {
-      console.log("%cDataChannel ← peer:", "color:purple;", data);
-      setChatMessages((prev) => [...prev, { sender: "peer", text: data }]);
-    };
+    dataChannelRef.current.onopen = () => setIsChannelOpen(true);
+    dataChannelRef.current.onclose = () => setIsChannelOpen(false);
+    dataChannelRef.current.onmessage = ({ data }) =>
+      setChatMessages((p) => [...p, { sender: "peer", text: data }]);
   }
 
-  // Envoi d’un message (chat)
   function sendMessage(text) {
-    console.log(
-      "sendMessage() →",
-      text,
-      "DCstate:",
-      dataChannelRef.current?.readyState
-    );
-    setChatMessages((prev) => [...prev, { sender: "local", text }]);
-
+    setChatMessages((p) => [...p, { sender: "local", text }]);
     if (dataChannelRef.current?.readyState === "open") {
       dataChannelRef.current.send(text);
-    } else {
-      console.warn("DataChannel pas open, message pas envoyé au pair :", text);
     }
   }
 
   function toggleMute() {
     const t = localStreamRef.current?.getAudioTracks()[0];
-    if (t) t.enabled = !t;
+    if (t) t.enabled = !t.enabled;
   }
 
   function hangUp() {
     if (isInitiator) {
       wsRef.current.send(JSON.stringify({ type: "end-call" }));
     }
-    console.log("hangUp()");
     setStatus("ended");
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    remoteStreamRef.current = new MediaStream();
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     setTimeout(() => {
       wsRef.current?.close();
