@@ -102,13 +102,6 @@ export default function useWebRTC(
       }
     };
 
-    const timer = setTimeout(() => {
-      if (statusRef.current !== "connected") {
-        console.log("timeout: no connection in", timeout, "ms");
-        setStatus("timeout");
-      }
-    }, timeout);
-
     return () => {
       clearTimeout(timer);
       wsRef.current?.close();
