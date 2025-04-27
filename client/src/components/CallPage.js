@@ -77,7 +77,20 @@ export default function CallPage({ callId }) {
       <header className="header">
         <span className="meeting-id">ID : {callId}</span>
         <div className="header-actions">
-          <button className="icon-btn" onClick={() => setChatOpen((o) => !o)}>
+          <button
+            className="icon-btn"
+            onClick={() => {
+              setChatOpen((o) => !o);
+              // dès que l'utilisateur tape, on débloque la lecture audio
+              if (remoteAudioRef.current) {
+                remoteAudioRef.current.play().catch(() => {
+                  /* silent */
+                });
+                // maintenant on peut enlever le muted
+                remoteAudioRef.current.muted = false;
+              }
+            }}
+          >
             <ChatBubbleOutlineIcon fontSize="small" />
           </button>
         </div>
@@ -157,7 +170,13 @@ export default function CallPage({ callId }) {
         </button>
       </footer>
 
-      <audio ref={remoteAudioRef} autoPlay playsInline className="audio-player" />
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
+        muted
+        className="audio-player"
+      />
     </div>
   );
 }
