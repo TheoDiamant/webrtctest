@@ -5,15 +5,50 @@ export default function useWebRTC(
   callId,
   { start = false, isInitiator = false, localStream = null }
 ) {
-  const [status, setStatus] = useState("waiting"); // waiting → connecting → connected → peer-left → ended
+  const [status, setStatus] = useState("waiting");
+  const [chatMessages, setChatMessages] = useState([]);
+  const [isChannelOpen, setIsChannelOpen] = useState(false);
+  const [localSpeaking, setLocalSpeaking] = useState(false);
+  const [remoteSpeaking, setRemoteSpeaking] = useState(false);
+
   const wsRef = useRef(null);
   const pcRef = useRef(null);
   const dcRef = useRef(null);
   const remoteAudioRef = useRef(null);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [isChannelOpen, setIsChannelOpen] = useState(false);
 
-  // 1) Signaling WebSocket
+  // —————————————
+  // 1) Détection de la voix locale
+  useEffect(() => {
+    if (!localStream) return;
+    const audioCtx = new AudioContext();
+    const source = audioCtx.createMediaStreamSource(localStream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    let rafId;
+
+    const detect = () => {
+      analyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) {
+        const v = data[i] - 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / data.length);
+      setLocalSpeaking(rms > 10);
+      rafId = requestAnimationFrame(detect);
+    };
+    detect();
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      audioCtx.close();
+    };
+  }, [localStream]);
+
+  // —————————————
+  // 2) Signaling WebSocket & RTC
   useEffect(() => {
     if (!start) return;
     const ws = new WebSocket(
@@ -21,15 +56,13 @@ export default function useWebRTC(
         `?roomId=${callId}`
     );
     wsRef.current = ws;
+
     ws.onopen = () => console.log("WS ▶︎ open");
     ws.onmessage = async ({ data }) => {
       const msg = JSON.parse(data);
       switch (msg.type) {
         case "room-status":
-          // Quand on a les deux et qu'on n'a pas encore démarré...
-          if (msg.peers === 2 && status === "waiting") {
-            await _startCall();
-          }
+          if (msg.peers === 2 && status === "waiting") await _startCall();
           break;
         case "offer":
           await pcRef.current.setRemoteDescription(msg.offer);
@@ -39,9 +72,7 @@ export default function useWebRTC(
           await pcRef.current.setRemoteDescription(msg.answer);
           break;
         case "candidate":
-          if (msg.candidate) {
-            await pcRef.current.addIceCandidate(msg.candidate);
-          }
+          if (msg.candidate) await pcRef.current.addIceCandidate(msg.candidate);
           break;
         case "end-call":
           _hangUp();
@@ -49,55 +80,82 @@ export default function useWebRTC(
       }
     };
     ws.onclose = () => console.log("WS ▶︎ closed");
+
     return () => {
       ws.close();
       pcRef.current?.close();
     };
-    // On ne dépend pas de status ici pour ne pas recréer la WS
-  }, [callId, start, localStream]);
+  }, [callId, start, localStream, status]);
 
-  // 2) Création de la RTCPeerConnection + échange SDP/ICE
   async function _startCall() {
     if (!localStream) {
-      console.warn("pas de MediaStream prêt, impossible de démarrer");
+      console.warn("pas de MediaStream prêt");
       return;
     }
-
     setStatus("connecting");
     const pc = new RTCPeerConnection({
       iceServers: [{ urls: process.env.REACT_APP_STUN_SERVER }],
     });
     pcRef.current = pc;
 
-    // a) suivi du connectionState
+    // suivi du state
     pc.onconnectionstatechange = () => {
-      console.log("PC state →", pc.connectionState);
       if (pc.connectionState === "connected") setStatus("connected");
-      else if (pc.connectionState === "disconnected" || pc.connectionState === "failed")
+      else if (
+        pc.connectionState === "disconnected" ||
+        pc.connectionState === "failed"
+      )
         setStatus("peer-left");
-      else if (pc.connectionState === "connecting") setStatus("connecting");
+      else if (pc.connectionState === "connecting")
+        setStatus("connecting");
     };
 
-    // b) ICE candidates
+    // ICE
     pc.onicecandidate = ({ candidate }) => {
-      if (candidate) {
+      if (candidate)
         wsRef.current.send(JSON.stringify({ type: "candidate", candidate }));
-      }
     };
 
-    // c) réception de l’audio distant
+    // réception de l’audio distant + détection de voix
     pc.ontrack = ({ streams: [stream] }) => {
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
+
+        // setup remote analyser
+        const audioCtx = new AudioContext();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        let rafId;
+        const detect = () => {
+          analyser.getByteTimeDomainData(data);
+          let sum = 0;
+          for (let i = 0; i < data.length; i++) {
+            const v = data[i] - 128;
+            sum += v * v;
+          }
+          const rms = Math.sqrt(sum / data.length);
+          setRemoteSpeaking(rms > 10);
+          rafId = requestAnimationFrame(detect);
+        };
+        detect();
+
+        // nettoyer si on quitte
+        return () => {
+          cancelAnimationFrame(rafId);
+          audioCtx.close();
+        };
       }
     };
 
-    // d) ajout des pistes locales
+    // envoi des pistes locales
     localStream.getTracks().forEach((track) => {
       pc.addTrack(track, localStream);
     });
 
-    // e) DataChannel
+    // data channel pour le chat
     if (isInitiator) {
       const dc = pc.createDataChannel("chat");
       dcRef.current = dc;
@@ -109,7 +167,7 @@ export default function useWebRTC(
       };
     }
 
-    // f) offer (si initiator)
+    // création de l’offre
     if (isInitiator) {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -124,7 +182,6 @@ export default function useWebRTC(
     wsRef.current.send(JSON.stringify({ type: "answer", answer }));
   }
 
-  // 3) Chat
   function _setupDataChannel(dc) {
     dc.onopen = () => setIsChannelOpen(true);
     dc.onclose = () => setIsChannelOpen(false);
@@ -134,12 +191,9 @@ export default function useWebRTC(
 
   function sendMessage(text) {
     setChatMessages((m) => [...m, { sender: "local", text }]);
-    if (dcRef.current?.readyState === "open") {
-      dcRef.current.send(text);
-    }
+    if (dcRef.current?.readyState === "open") dcRef.current.send(text);
   }
 
-  // 4) utilitaires
   function toggleMute() {
     const t = localStream?.getAudioTracks()[0];
     if (t) t.enabled = !t;
@@ -161,5 +215,7 @@ export default function useWebRTC(
     toggleMute,
     hangUp: _hangUp,
     isChannelOpen,
+    localSpeaking,
+    remoteSpeaking,
   };
 }

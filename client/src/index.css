@@ -1,15 +1,4 @@
-.container, .call-container { display: flex; flex-direction: column; align-items: center; padding: 1rem; min-height: 100vh; }
-input, button { padding: 0.5rem; margin: 0.5rem; }
-.status { margin-bottom: 1rem; }
-.controls { display: flex; gap: 1rem; margin-bottom: 1rem; }
-.chat-messages { flex: 1; overflow-y: auto; padding: 0.5rem; }
-.message.local { text-align: right; }
-.message.peer { text-align: left; }
-.chat-input { display: flex; border-top: 1px solid #ccc; }
-.chat-input input { flex: 1; border: none; padding: 0.5rem; }
-.chat-input button { border: none; cursor: pointer; }
-
-
+/* src/pages/CallPage.css */
 
 /* =============================
    Global Reset & Base
@@ -40,35 +29,35 @@ input, button { padding: 0.5rem; margin: 0.5rem; }
   /* =============================
      Header
      ============================= */
-     .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.5rem 1rem;      /* réduit la hauteur */
-        background: #303134;
-      }
-      .meeting-id {
-        font-size: 1rem;
-        color: #e8eaed;
-        font-weight: 500;
-      }
-      .header-actions .icon-btn {
-        background: transparent;
-        border: none;
-        color: #e8eaed;
-        cursor: pointer;
-        padding: 0.4rem;          /* moins large */
-        border-radius: 50%;
-        display: none
-      }
-      .header-actions .icon-btn:hover {
-        background: rgba(255,255,255,0.1);
-      }
-
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background: #303134;
+  }
+  .meeting-id {
+    font-size: 1rem;
+    color: #e8eaed;
+    font-weight: 500;
+  }
+  .header-actions .icon-btn {
+    background: transparent;
+    border: none;
+    color: #e8eaed;
+    cursor: pointer;
+    padding: 0.4rem;
+    border-radius: 50%;
+    display: none;
+  }
+  .header-actions .icon-btn:hover {
+    background: rgba(255,255,255,0.1);
+  }
+  
   /* =============================
-   PrecallSplash Styles
-   ============================= */
-.splash-container {
+     PrecallSplash Styles
+     ============================= */
+  .splash-container {
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -107,31 +96,11 @@ input, button { padding: 0.5rem; margin: 0.5rem; }
     background: #1a73e8;
     transition: width 0.3s;
   }
-
+  
   /* =============================
-   CallPage Container & Theme
-   ============================= */
-.call-app {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    background: #202124;
-  }
-
-  .audio-player {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    top: 0;
-    left: 0;
-    pointer-events: none;
-  }
-
-  /* =============================
-   Status Indicator sous le header
-   ============================= */
-.status-indicator {
+     Status Indicator
+     ============================= */
+  .status-indicator {
     text-align: center;
     padding: 0.5rem 1rem;
     color: #1a73e8;
@@ -140,8 +109,6 @@ input, button { padding: 0.5rem; margin: 0.5rem; }
     margin: 0 1rem;
     border-radius: 8px;
   }
-  
-  
   
   /* =============================
      Incoming Call Screen
@@ -183,46 +150,27 @@ input, button { padding: 0.5rem; margin: 0.5rem; }
     grid-template-rows: 1fr;
     gap: 1rem;
     padding: 1rem;
-    align-items: center; /* center vertically */
+    align-items: center;
   }
   .divider {
-    background: rgba(255,255,255,0.2); /* very light */
     width: 1px;
     height: 50%;
+    background: rgba(255,255,255,0.1);
     justify-self: center;
   }
   
   /* =============================
      Video Card & Profile Picture
-     =============================
-     Pure circle profiles
      ============================= */
   .video-card {
     background: transparent;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center; /* center icons vertically */
+    justify-content: center;
     padding: 0.5rem;
     position: relative;
   }
-
-  .mute-indicator {
-    position: absolute;
-    top: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(234, 67, 53, 0.9);
-    color: #fff;
-    padding: 2px 6px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    z-index: 2;
-  }
-
   .pic-wrapper {
     position: relative;
     width: 160px;
@@ -251,99 +199,28 @@ input, button { padding: 0.5rem; margin: 0.5rem; }
     0%   { transform: translate(-50%,-50%) scale(1);   opacity: 1; }
     100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; }
   }
+  .mute-indicator {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(234, 67, 53, 0.9);
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    z-index: 2;
+  }
   .name {
     font-size: 1rem;
     color: #e8eaed;
   }
   
- /* =============================
-   Chat Panel & Messages
-   ============================= */
-.chat-panel {
-    display: flex;
-    height: 100%;
-    background: #202124;
-    align-items: flex-end;
-  }
-  
-  .chat-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    border: 1px solid #3e3e3e;
-  }
-  
-  .chat-messages {
-    flex: 1;
-    padding: 0.75rem;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  
-  .message {
-    max-width: 80%;
-    border-radius: 8px;
-    padding: 0.5rem;
-  }
-  
-  .message.host {
-    align-self: flex-end;
-    background: #3c4043;
-  }
-  
-  .message.guest {
-    align-self: flex-start;
-    background: #424548;
-  }
-  
-  .msg-label {
-    font-size: 0.75rem;
-    font-weight: 500;
-    margin-bottom: 0.25rem;
-    color: #c0c0c0;
-  }
-  
-  .msg-text {
-    font-size: 0.9rem;
-    color: #e8eaed;
-  }
-  
-  .chat-input {
-    display: flex;
-    border-top: 1px solid rgba(255,255,255,0.1);
-  }
-  
-  .chat-input input {
-    flex: 1;
-    padding: 0.75rem;
-    background: #303134;
-    border: none;
-    color: #e8eaed;
-  }
-  
-  .chat-input button {
-    background: #3c4043;
-    border: none;
-    padding: 0 1rem;
-    color: #e8eaed;
-    cursor: pointer;
-  }
-  
   /* =============================
-     Divider très léger
-     ============================= */
-  .divider {
-    width: 1px;
-    height: 50%;
-    background: rgba(255,255,255,0.1);
-    justify-self: center;
-  }
-  
-  
-  /* =============================
-     Footer Controls (no border around icons)
+     Footer Controls
      ============================= */
   .controls {
     padding: 1rem;
@@ -369,24 +246,27 @@ input, button { padding: 0.5rem; margin: 0.5rem; }
   /* =============================
      Audio Player (hidden)
      ============================= */
-  .audio-player { display: none; }
+  .audio-player {
+    display: none;
+  }
   
   /* =============================
      Responsive Mobile
      ============================= */
   @media (max-width: 768px) {
     .header-actions .icon-btn {
-       
-        display: block
-      }
+      display: block;
+    }
     .header-actions .icon-btn:nth-child(2) {
-        display: none;
-      }
+      display: none;
+    }
     .main-grid {
       grid-template-columns: 1fr;
       grid-template-rows: auto auto;
     }
-    .chat-panel { display: none; }
+    .chat-panel {
+      display: none;
+    }
     .chat-open .chat-panel {
       display: flex;
       position: absolute;
@@ -398,8 +278,8 @@ input, button { padding: 0.5rem; margin: 0.5rem; }
       z-index: 100;
       border-radius: 12px;
     }
-    .controls { gap: 1rem; }
+    .controls {
+      gap: 1rem;
+    }
   }
-  
-
   
