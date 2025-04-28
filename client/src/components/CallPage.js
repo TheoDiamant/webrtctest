@@ -1,11 +1,12 @@
 // src/pages/CallPage.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import useWebRTC from "../hooks/useWebRTC";
 import PrecallSplash from "../components/PrecallSplash";
-
+import Chat from "../components/Chat";
 import MicIcon from "@mui/icons-material/Mic";
 import MicOffIcon from "@mui/icons-material/MicOff";
 import CallEndIcon from "@mui/icons-material/CallEnd";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 
 export default function CallPage({ callId }) {
   const params = new URLSearchParams(window.location.search);
@@ -14,24 +15,25 @@ export default function CallPage({ callId }) {
     sessionStorage.getItem("isInitiator") === "true";
 
   const [localStream, setLocalStream] = useState(null);
-  const [splashDone, setSplashDone] = useState(isInitiator);
+  const [splashDone, setSplashDone] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [muted, setMuted] = useState(false);
 
   const {
     remoteAudioRef,
     status,
-    hangUp,
+    chatMessages,
+    sendMessage,
     toggleMute,
-    localSpeaking,
-    remoteSpeaking,
-    remoteMuted,
+    hangUp,
+    isChannelOpen,
   } = useWebRTC(callId, {
     start: splashDone && !!localStream,
     isInitiator,
     localStream,
   });
 
-  // 1) On récupère le micro puis on démarre la session
+  // Quand l’utilisateur clique sur « Rejoindre »
   const handleJoin = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -43,89 +45,51 @@ export default function CallPage({ callId }) {
     }
   };
 
-  // 2) Splash avant join
   if (!splashDone) {
     return <PrecallSplash onReady={handleJoin} />;
   }
 
-  // 3) UI principale
   return (
-    <div className="call-app dark">
-      <header className="header">
-        <span className="meeting-id">ID : {callId}</span>
+    <div className={`call-app dark${chatOpen ? " chat-open" : ""}`}>
+      <header>
+        <span>ID : {callId}</span>
+        <button onClick={() => setChatOpen((o) => !o)}>
+          <ChatBubbleOutlineIcon />
+        </button>
       </header>
 
-      {isInitiator && (
-        <div className="status-indicator">
-          {status === "waiting" && "En attente de l’autre personne…"}
-          {status === "connecting" && "Connexion en cours…"}
-          {status === "connected" && "Interlocuteur connecté !"}
-          {status === "peer-left" && "L’autre personne a quitté"}
-          {status === "ended" && "Appel terminé"}
-        </div>
-      )}
+      {/* Status pour l’hôte */}
+      {isInitiator && <div className="status">{status}</div>}
 
-      <main className="main-grid">
-        {/* Votre carte */}
-        <div className="video-card">
-          {muted && (
-            <div className="mute-indicator local">
-              <MicOffIcon fontSize="small" /> Muet
-            </div>
-          )}
-          <div className="pic-wrapper">
-            <img
-              src="/images/icon.png"
-              alt="Vous"
-              className="profile-pic"
+      <main>
+        <div className="card">
+          <div className="you">Vous</div>
+          <button onClick={() => { toggleMute(); setMuted((m) => !m); }}>
+            {muted ? <MicOffIcon /> : <MicIcon />}
+          </button>
+        </div>
+        <div className="card">
+          <div className="them">Interlocuteur</div>
+        </div>
+        {chatOpen && (
+          <aside>
+            <Chat
+              messages={chatMessages}
+              onSend={sendMessage}
+              isChannelOpen={isChannelOpen}
             />
-            {localSpeaking && <div className="wave" />}
-          </div>
-          <span className="name">Vous</span>
-        </div>
-
-        <div className="divider" />
-
-        {/* Carte de l’interlocuteur */}
-        <div className="video-card">
-          {remoteMuted && (
-            <div className="mute-indicator remote">
-              <MicOffIcon fontSize="small" /> Muet
-            </div>
-          )}
-          <div className="pic-wrapper">
-            <img
-              src="/images/icon.png"
-              alt="Interlocuteur"
-              className="profile-pic"
-            />
-            {remoteSpeaking && <div className="wave" />}
-          </div>
-          <span className="name">Interlocuteur</span>
-        </div>
+          </aside>
+        )}
       </main>
 
-      <footer className="controls">
-        <button
-          className="icon-btn mute-btn"
-          onClick={() => {
-            toggleMute();
-            setMuted((m) => !m);
-          }}
-        >
-          {muted ? (
-            <MicOffIcon fontSize="large" />
-          ) : (
-            <MicIcon fontSize="large" />
-          )}
-        </button>
-        <button className="icon-btn hangup-btn" onClick={hangUp}>
-          <CallEndIcon fontSize="large" />
+      <footer>
+        <button onClick={hangUp}>
+          <CallEndIcon />
         </button>
       </footer>
 
-      {/* Audio distant */}
-      <audio ref={remoteAudioRef} autoPlay className="audio-player" />
+      {/* On n’attache l’audio distant que si on a bien un stream */}
+      <audio ref={remoteAudioRef} autoPlay />
     </div>
   );
 }
