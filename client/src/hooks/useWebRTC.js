@@ -43,8 +43,14 @@ export default function useWebRTC(
             await pcRef.current.addIceCandidate(msg.candidate);
           }
           break;
+        // Hôte a raccroché
+        case "call-ended":
+          _remoteHangUp();
+          break;
+
+        // propre à l’hôte après envoi de end-call
         case "end-call":
-          _hangUp();
+          _hangUp(true);
           break;
       }
     };
@@ -54,7 +60,7 @@ export default function useWebRTC(
       pcRef.current?.close();
     };
     // On ne dépend pas de status ici pour ne pas recréer la WS
-  }, [callId, start, localStream]);
+  }, [callId, start, localStream, status]);
 
   // 2) Création de la RTCPeerConnection + échange SDP/ICE
   async function _startCall() {
@@ -73,7 +79,10 @@ export default function useWebRTC(
     pc.onconnectionstatechange = () => {
       console.log("PC state →", pc.connectionState);
       if (pc.connectionState === "connected") setStatus("connected");
-      else if (pc.connectionState === "disconnected" || pc.connectionState === "failed")
+      else if (
+        pc.connectionState === "disconnected" ||
+        pc.connectionState === "failed"
+      )
         setStatus("peer-left");
       else if (pc.connectionState === "connecting") setStatus("connecting");
     };
@@ -145,12 +154,17 @@ export default function useWebRTC(
     if (t) t.enabled = !t;
   }
 
-  function _hangUp() {
+  function _hangUp(isHost) {
     setStatus("ended");
     localStream?.getTracks().forEach((t) => t.stop());
     pcRef.current?.close();
-    wsRef.current.send(JSON.stringify({ type: "end-call" }));
+    if (isHost) wsRef.current.send(JSON.stringify({ type: "end-call" }));
     wsRef.current.close();
+  }
+
+  // Invite remote
+  function _remoteHangUp() {
+    _hangUp(false);
   }
 
   return {
@@ -159,7 +173,7 @@ export default function useWebRTC(
     chatMessages,
     sendMessage,
     toggleMute,
-    hangUp: _hangUp,
+    hangUp: () => _hangUp(true),
     isChannelOpen,
   };
 }
