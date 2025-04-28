@@ -1,4 +1,3 @@
-// src/components/PrecallSplash.jsx
 import React, { useState, useEffect } from "react";
 
 export default function PrecallSplash({ onReady }) {
@@ -26,37 +25,39 @@ export default function PrecallSplash({ onReady }) {
   }, [phase, stepIndex, onReady]);
 
   return (
-    <div className="splash-container">
-      {phase === "invite" ? (
-        <>
-          <h2 className="splash-title">
-            Vous avez été invité·e à rejoindre
-            <br />
-            une discussion hautement sécurisée
-          </h2>
-          <button
-            className="join-btn"
-            onClick={() => {
-              setPhase("loading");
-              setStepIndex(0);
-            }}
-          >
-            Rejoindre
-          </button>
-        </>
-      ) : (
-        <>
-          <p className="splash-step">{steps[stepIndex]?.label}</p>
-          <div className="splash-loader">
-            <div
-              className="bar"
-              style={{
-                width: `${((stepIndex + 1) / steps.length) * 100}%`,
+    <div className="splash-backdrop">
+      <div className="splash-card">
+        {phase === "invite" ? (
+          <>
+            <h2 className="splash-title">
+              🔒 Vous avez été invité·e à rejoindre une
+              <br />
+              session de communication sécurisée
+            </h2>
+            <button
+              className="join-btn"
+              onClick={() => {
+                setPhase("loading");
+                setStepIndex(0);
               }}
-            />
-          </div>
-        </>
-      )}
+            >
+              Rejoindre
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="splash-step">{steps[stepIndex]?.label}</p>
+            <div className="splash-loader">
+              <div
+                className="bar"
+                style={{
+                  width: `${((stepIndex + 1) / steps.length) * 100}%`,
+                }}
+              />
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
