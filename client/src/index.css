@@ -143,15 +143,17 @@
   /* =============================
      Main Grid & Divider
      ============================= */
-  .main-grid {
+/* Main Grid reduit à 2 colonnes + divider */
+.main-grid {
     flex: 1;
     display: grid;
-    grid-template-columns: 1fr 1px 1fr 320px;
+    grid-template-columns: 1fr 1px 1fr; /* LOCAL | DIVIDER | REMOTE */
     grid-template-rows: 1fr;
     gap: 1rem;
     padding: 1rem;
     align-items: center;
   }
+  
   .divider {
     width: 1px;
     height: 50%;
@@ -159,70 +161,42 @@
     justify-self: center;
   }
   
-  /* =============================
-     Video Card & Profile Picture
-     ============================= */
-  .video-card {
-    background: transparent;
+ /* =============================
+   Video Card & Avatar
+   ============================= */
+.video-card {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0.5rem;
-    position: relative;
   }
-  .pic-wrapper {
-    position: relative;
+  .avatar-wrapper {
     width: 160px;
     height: 160px;
-    margin-bottom: 0.5rem;
-  }
-  .profile-pic {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    object-fit: cover;
     border: 2px solid rgba(255,255,255,0.2);
-  }
-  .wave {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 160px;
-    height: 160px;
-    border: 4px solid rgba(66,133,244,0.6);
     border-radius: 50%;
-    transform: translate(-50%, -50%) scale(1);
-    animation: wave 1.8s infinite ease-out;
-  }
-  @keyframes wave {
-    0%   { transform: translate(-50%,-50%) scale(1);   opacity: 1; }
-    100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; }
-  }
-  .mute-indicator {
-    position: absolute;
-    top: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(234, 67, 53, 0.9);
-    color: #fff;
-    padding: 2px 6px;
-    border-radius: 12px;
-    font-size: 0.75rem;
     display: flex;
     align-items: center;
-    gap: 4px;
-    z-index: 2;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+  }
+  .avatar {
+    width: 80px;
+    height: 80px;
   }
   .name {
     font-size: 1rem;
     color: #e8eaed;
+    text-align: center;
+    margin-bottom: 0.5rem;
   }
   
+  
   /* =============================
-     Footer Controls
-     ============================= */
-  .controls {
+   Footer Controls
+   ============================= */
+.controls {
     padding: 1rem;
     display: flex;
     justify-content: center;
@@ -232,7 +206,6 @@
   .controls .icon-btn {
     background: transparent;
     border: none;
-    color: #e8eaed;
     cursor: pointer;
     padding: 0.75rem;
     border-radius: 50%;
@@ -240,8 +213,12 @@
   .controls .icon-btn:hover {
     background: rgba(255,255,255,0.1);
   }
-  .hangup-btn .MuiSvgIcon-root { color: #ea4335 !important; }
-  .mute-btn .MuiSvgIcon-root { color: #e8eaed !important; }
+  .mute-btn .MuiSvgIcon-root {
+    color: #e8eaed !important;
+  }
+  .hangup-btn .MuiSvgIcon-root {
+    color: #ea4335 !important;
+  }
   
   /* =============================
      Audio Player (hidden)
