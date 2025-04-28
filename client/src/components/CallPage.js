@@ -1,5 +1,5 @@
 // src/pages/CallPage.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import useWebRTC from "../hooks/useWebRTC";
 import PrecallSplash from "../components/PrecallSplash";
 import Chat from "../components/Chat";
@@ -44,7 +44,9 @@ export default function CallPage({ callId }) {
     }
   };
 
-  if (!splashDone) return <PrecallSplash onReady={handleJoin} />;
+  if (!splashDone) {
+    return <PrecallSplash onReady={handleJoin} />;
+  }
 
   return (
     <div className={`call-app${chatOpen ? " chat-open" : ""}`}>
@@ -60,45 +62,17 @@ export default function CallPage({ callId }) {
       {isInitiator && <div className="status-indicator">{status}</div>}
 
       <main className="main-grid">
-        {/* Local User */}
-        <div className="video-card">
-          <div className="pic-wrapper">
-            <img
-              className="profile-pic"
-              src="https://via.placeholder.com/160"
-              alt="Vous"
-            />
-            <div className="wave" />
-            {muted && (
-              <div className="mute-indicator">
-                <MicOffIcon fontSize="small" />
-              </div>
-            )}
-          </div>
+        <div className="card">
           <div className="name">Vous</div>
           <button
             className="icon-btn mute-btn"
-            onClick={() => {
-              toggleMute();
-              setMuted((m) => !m);
-            }}
+            onClick={() => { toggleMute(); setMuted((m) => !m); }}
           >
             {muted ? <MicOffIcon /> : <MicIcon />}
           </button>
         </div>
-
         <div className="divider" />
-
-        {/* Remote User */}
-        <div className="video-card">
-          <div className="pic-wrapper">
-            <img
-              className="profile-pic"
-              src="https://via.placeholder.com/160"
-              alt="Interlocuteur"
-            />
-            <div className="wave" />
-          </div>
+        <div className="card">
           <div className="name">Interlocuteur</div>
         </div>
 
