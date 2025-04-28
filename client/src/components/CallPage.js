@@ -27,8 +27,6 @@ export default function CallPage({ callId }) {
     toggleMute,
     hangUp,
     isChannelOpen,
-    localSpeaking,
-    remoteSpeaking,
   } = useWebRTC(callId, {
     start: splashDone && !!localStream,
     isInitiator,
@@ -53,18 +51,13 @@ export default function CallPage({ callId }) {
       <header className="header">
         <span className="meeting-id">ID : {callId}</span>
         <div className="header-actions">
-          <button
-            className="icon-btn"
-            onClick={() => setChatOpen((o) => !o)}
-          >
+          <button className="icon-btn" onClick={() => setChatOpen((o) => !o)}>
             <ChatBubbleOutlineIcon />
           </button>
         </div>
       </header>
 
-      {isInitiator && (
-        <div className="status-indicator">{status}</div>
-      )}
+      {isInitiator && <div className="status-indicator">{status}</div>}
 
       <main className="main-grid">
         {/* Local User */}
@@ -72,10 +65,10 @@ export default function CallPage({ callId }) {
           <div className="pic-wrapper">
             <img
               className="profile-pic"
-              src="/images/icon.png"
+              src="https://via.placeholder.com/160"
               alt="Vous"
             />
-            {localSpeaking && <div className="wave" />}
+            <div className="wave" />
             {muted && (
               <div className="mute-indicator">
                 <MicOffIcon fontSize="small" />
@@ -101,10 +94,10 @@ export default function CallPage({ callId }) {
           <div className="pic-wrapper">
             <img
               className="profile-pic"
-              src="/images/icon.png"
+              src="https://via.placeholder.com/160"
               alt="Interlocuteur"
             />
-            {remoteSpeaking && <div className="wave" />}
+            <div className="wave" />
           </div>
           <div className="name">Interlocuteur</div>
         </div>
@@ -126,11 +119,7 @@ export default function CallPage({ callId }) {
         </button>
       </footer>
 
-      <audio
-        ref={remoteAudioRef}
-        autoPlay
-        className="audio-player"
-      />
+      <audio ref={remoteAudioRef} autoPlay className="audio-player" />
     </div>
   );
 }
